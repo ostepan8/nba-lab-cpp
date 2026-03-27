@@ -64,33 +64,52 @@ std::vector<PlayerGame> parse_gamelogs(const std::string& data_dir) {
         while (std::getline(f, line)) {
             if (line.empty()) continue;
             auto cols = split_csv_line(line);
-            if (cols.size() < 33) continue;
+            if (cols.size() < 30) continue;  // Min columns: some seasons have 32, others 70
 
             PlayerGame g;
-            // cols[0]=SEASON_YEAR, [1]=PLAYER_ID, [2]=PLAYER_NAME
+            // Two formats: 32 cols (2022-24) and 70 cols (2025-26)
+            // Common: [0]=SEASON, [1]=PLAYER_ID, [2]=PLAYER_NAME
             g.player_id   = safe_int(cols[1]);
             g.player_name = cols[2];
-            g.team        = cols[5];  // TEAM_ABBREVIATION
-            g.game_date   = extract_date(cols[8]);  // GAME_DATE
-            g.matchup     = cols[9];  // MATCHUP
+
+            if (cols.size() >= 70) {
+                // 2025-26 extended format (70 cols)
+                g.team        = cols[5];
+                g.game_date   = extract_date(cols[8]);
+                g.matchup     = cols[9];
+                g.minutes     = safe_double(cols[11]);
+                g.fgm         = safe_double(cols[12]);
+                g.fga         = safe_double(cols[13]);
+                g.fg3m        = safe_double(cols[15]);
+                g.ftm         = safe_double(cols[18]);
+                g.fta         = safe_double(cols[19]);
+                g.reb         = safe_double(cols[23]);
+                g.ast         = safe_double(cols[24]);
+                g.tov         = safe_double(cols[25]);
+                g.stl         = safe_double(cols[26]);
+                g.blk         = safe_double(cols[27]);
+                g.pts         = safe_double(cols[31]);
+                g.plus_minus  = safe_double(cols[32]);
+            } else {
+                // Standard format (32 cols): 2022-23, 2023-24, 2024-25
+                g.team        = cols[4];   // TEAM_ABBREVIATION
+                g.game_date   = extract_date(cols[7]);  // GAME_DATE
+                g.matchup     = cols[8];   // MATCHUP
+                g.minutes     = safe_double(cols[10]);  // MIN
+                g.fgm         = safe_double(cols[11]);
+                g.fga         = safe_double(cols[12]);
+                g.fg3m        = safe_double(cols[14]);
+                g.ftm         = safe_double(cols[17]);
+                g.fta         = safe_double(cols[18]);
+                g.reb         = safe_double(cols[22]);
+                g.ast         = safe_double(cols[23]);
+                g.stl         = safe_double(cols[24]);
+                g.blk         = safe_double(cols[25]);
+                g.tov         = safe_double(cols[26]);
+                g.pts         = safe_double(cols[28]);
+                g.plus_minus  = safe_double(cols[29]);
+            }
             g.is_home     = (g.matchup.find("vs.") != std::string::npos);
-            g.minutes     = safe_double(cols[11]); // MIN (fractional minutes)
-            g.fgm         = safe_double(cols[12]);
-            g.fga         = safe_double(cols[13]);
-            // cols[14]=FG_PCT
-            g.fg3m        = safe_double(cols[15]);
-            // cols[16]=FG3A, cols[17]=FG3_PCT
-            g.ftm         = safe_double(cols[18]);
-            g.fta         = safe_double(cols[19]);
-            // cols[20]=FT_PCT, cols[21]=OREB, cols[22]=DREB
-            g.reb         = safe_double(cols[23]);
-            g.ast         = safe_double(cols[24]);
-            g.tov         = safe_double(cols[25]);
-            g.stl         = safe_double(cols[26]);
-            g.blk         = safe_double(cols[27]);
-            // cols[28]=BLKA, cols[29]=PF, cols[30]=PFD
-            g.pts         = safe_double(cols[31]);
-            g.plus_minus  = safe_double(cols[32]);
 
             all.push_back(std::move(g));
         }

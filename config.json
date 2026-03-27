@@ -1,9 +1,9 @@
 {
-  "data_dir": "~/Desktop/nba-modeling/data/raw",
-  "kalshi_dir": "~/Desktop/nba-modeling/data/raw/kalshi",
-  "output_dir": "~/Desktop/nba-modeling/results",
-  "knowledge_path": "~/Desktop/nba-modeling/results/lab/knowledge_cpp.json",
-  "notify_script": "~/claude-code-linux-harness/notify.sh",
+  "data_dir": "/home/ostepan8/Desktop/nba-modeling/data/raw",
+  "kalshi_dir": "/home/ostepan8/Desktop/nba-modeling/data/raw/kalshi",
+  "output_dir": "/home/ostepan8/Desktop/nba-modeling/results",
+  "knowledge_path": "/home/ostepan8/Desktop/nba-modeling/results/lab/knowledge_cpp.json",
+  "notify_script": "/home/ostepan8/claude-code-linux-harness/notify.sh",
   "fast_workers": 6,
   "slow_workers": 2,
   "meanrev_weight": 0.17,
@@ -21,7 +21,7 @@
   "neural_weight": 0.05,
   "spreads_weight": 0.03,
   "totals_weight": 0.02,
-  "notify_enabled": false,
+  "notify_enabled": true,
   "notify_min_roi": 0.0,
   "kalshi_fee_rate": 0.038
 }
