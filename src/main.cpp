@@ -4,7 +4,10 @@
 #include "features/odds.h"
 #include "strategies/strategy.h"
 #include "strategies/meanrev.h"
+#include "strategies/situational.h"
+#include "strategies/twostage.h"
 #include "engine/lab.h"
+#include "io/knowledge.h"
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <cstdio>
@@ -28,12 +31,14 @@ static void print_usage() {
     printf("Commands:\n");
     printf("  run                     Run the lab (parallel experiments forever)\n");
     printf("  single --config '{...}' Run one experiment from JSON config\n");
-    printf("  bench  [N]              Benchmark: run N meanrev experiments (default 100)\n");
-    printf("  info                    Load data and print summary (original behavior)\n");
+    printf("  bench  [N]              Benchmark: run N experiments (default 100)\n");
+    printf("  info                    Load data and print summary\n");
+    printf("  leaderboard             Print current knowledge base leaderboard\n");
     printf("\nOptions:\n");
     printf("  --data <dir>            Data directory (default: ~/Desktop/nba-modeling/data/raw)\n");
     printf("  --fast <N>              Fast worker threads (default: auto)\n");
     printf("  --slow <N>              Slow worker threads (default: 2)\n");
+    printf("  --kb <path>             Knowledge base path (default: ~/Desktop/nba-modeling/results/lab/knowledge_cpp.json)\n");
 }
 
 struct DataBundle {
@@ -50,7 +55,7 @@ static DataBundle load_data(const std::string& data_dir) {
     db.store.load_all(data_dir);
     auto t1 = high_resolution_clock::now();
 
-    printf("  Data loaded in %ldms — %zu players, %zu prop dates, %zu games\n",
+    printf("  Data loaded in %ldms -- %zu players, %zu prop dates, %zu games\n",
            duration_cast<milliseconds>(t1 - t0).count(),
            db.store.num_players(), db.store.num_prop_dates(),
            db.store.num_games());
@@ -83,6 +88,7 @@ int main(int argc, char* argv[]) {
     std::string data_dir = "~/Desktop/nba-modeling/data/raw";
     std::string command = "info";
     std::string config_json;
+    std::string kb_path = "~/Desktop/nba-modeling/results/lab/knowledge_cpp.json";
     int bench_n = 100;
     int fast_workers = static_cast<int>(std::thread::hardware_concurrency());
     if (fast_workers < 2) fast_workers = 6;
@@ -91,7 +97,8 @@ int main(int argc, char* argv[]) {
     // Parse arguments
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
-        if (arg == "run" || arg == "single" || arg == "bench" || arg == "info") {
+        if (arg == "run" || arg == "single" || arg == "bench" ||
+            arg == "info" || arg == "leaderboard") {
             command = arg;
         } else if (arg == "--data" && i + 1 < argc) {
             data_dir = argv[++i];
@@ -101,29 +108,60 @@ int main(int argc, char* argv[]) {
             fast_workers = std::atoi(argv[++i]);
         } else if (arg == "--slow" && i + 1 < argc) {
             slow_workers = std::atoi(argv[++i]);
+        } else if (arg == "--kb" && i + 1 < argc) {
+            kb_path = argv[++i];
         } else if (arg == "-h" || arg == "--help") {
             print_usage();
             return 0;
         } else if (command == "bench") {
-            // Positional arg after bench = count
             bench_n = std::atoi(argv[i]);
             if (bench_n <= 0) bench_n = 100;
         }
     }
 
     data_dir = expand_home(data_dir);
+    kb_path = expand_home(kb_path);
 
-    // Load all data
+    // For leaderboard command, we only need the knowledge base
+    if (command == "leaderboard") {
+        nba::KnowledgeBase kb;
+        kb.load(kb_path);
+        auto lb = kb.get_leaderboard();
+        if (lb.empty()) {
+            printf("No leaderboard entries yet at: %s\n", kb_path.c_str());
+            return 0;
+        }
+
+        printf("\n=== KNOWLEDGE BASE LEADERBOARD ===\n");
+        printf("Path: %s\n", kb_path.c_str());
+        printf("Experiments run: %d | Runtime: %.1f hours\n\n",
+               kb.experiments_run(), kb.total_runtime_hours());
+        printf("%-22s %8s %8s %6s %8s  %s\n",
+               "Market", "ROI%", "WR%", "Bets", "p-value", "Approach");
+        printf("%-22s %8s %8s %6s %8s  %s\n",
+               "------", "----", "---", "----", "-------", "--------");
+
+        for (const auto& [market, entry] : lb) {
+            printf("%-22s %7.1f%% %7.1f%% %6d %8.4f  %s\n",
+                   market.c_str(),
+                   entry.roi * 100, entry.wr * 100,
+                   entry.bets, entry.pvalue,
+                   entry.approach.c_str());
+        }
+        printf("\n");
+        return 0;
+    }
+
+    // All other commands need data
     auto db = load_data(data_dir);
 
     if (command == "info") {
-        // Original info dump
         auto& jokic_games = db.store.get_player_games_by_name("Nikola Joki\xc4\x87");
         if (!jokic_games.empty()) {
-            printf("Sanity check — Nikola Jokić:\n");
+            printf("Sanity check -- Nikola Jokic:\n");
             printf("  Total games: %zu\n", jokic_games.size());
             auto& last = jokic_games.back();
-            printf("  Last game: %s %s — %.0f pts, %.0f reb, %.0f ast\n",
+            printf("  Last game: %s %s -- %.0f pts, %.0f reb, %.0f ast\n",
                    last.game_date.c_str(), last.matchup.c_str(),
                    last.pts, last.reb, last.ast);
         }
@@ -153,16 +191,19 @@ int main(int argc, char* argv[]) {
 
         nba::Lab lab(db.store, db.player_index, db.kalshi,
                      fast_workers, slow_workers);
+        lab.set_knowledge_path(kb_path);
         lab.run_single(config);
 
     } else if (command == "bench") {
         nba::Lab lab(db.store, db.player_index, db.kalshi,
                      fast_workers, slow_workers);
+        lab.set_knowledge_path(kb_path);
         lab.bench(bench_n);
 
     } else if (command == "run") {
         nba::Lab lab(db.store, db.player_index, db.kalshi,
                      fast_workers, slow_workers);
+        lab.set_knowledge_path(kb_path);
         lab.run();
     }
 

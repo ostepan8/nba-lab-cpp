@@ -1,5 +1,9 @@
 #include "lab.h"
 #include "../strategies/meanrev.h"
+#include "../strategies/situational.h"
+#include "../strategies/twostage.h"
+#include "../io/bet_history.h"
+#include "../io/notify.h"
 #include <nlohmann/json.hpp>
 #include <thread>
 #include <queue>
@@ -25,8 +29,8 @@ static const std::vector<std::pair<std::string, std::string>> MARKET_STAT_PAIRS 
     {"player_blocks",    "BLK"},
 };
 
-static const std::vector<std::string> SIDE_OPTIONS = {
-    "OVER", "UNDER"
+static const std::vector<std::string> STRATEGY_TYPES = {
+    "meanrev", "situational", "twostage"
 };
 
 // ---- Constructor ----
@@ -61,32 +65,38 @@ std::unique_ptr<Strategy> Lab::create_strategy(const std::string& type) {
     if (type == "meanrev") {
         return std::make_unique<MeanRevStrategy>();
     }
-    // Future: "situational", "combo", etc.
+    if (type == "situational") {
+        return std::make_unique<SituationalStrategy>();
+    }
+    if (type == "twostage") {
+        return std::make_unique<TwostageStrategy>();
+    }
+    // Default fallback
     return std::make_unique<MeanRevStrategy>();
 }
 
-// ---- Hypothesis generation ----
+// ---- Knowledge base path ----
 
-StrategyConfig Lab::generate_hypothesis(const std::string& queue_type) {
+void Lab::set_knowledge_path(const std::string& path) {
+    knowledge_path_ = path;
+    knowledge_.load(path);
+}
+
+// ---- Hypothesis generation per strategy type ----
+
+StrategyConfig Lab::generate_meanrev_config() {
     StrategyConfig c;
     c.type = "meanrev";
 
-    // Pick a random market/stat pair
     int pair_idx = rand_int(0, static_cast<int>(MARKET_STAT_PAIRS.size()) - 1);
     c.target_market = MARKET_STAT_PAIRS[pair_idx].first;
     c.target_stat = MARKET_STAT_PAIRS[pair_idx].second;
 
-    // Random sides: both, over-only, or under-only
     int side_mode = rand_int(0, 2);
-    if (side_mode == 0) {
-        c.sides = {"OVER", "UNDER"};
-    } else if (side_mode == 1) {
-        c.sides = {"OVER"};
-    } else {
-        c.sides = {"UNDER"};
-    }
+    if (side_mode == 0)      c.sides = {"OVER", "UNDER"};
+    else if (side_mode == 1) c.sides = {"OVER"};
+    else                     c.sides = {"UNDER"};
 
-    // Randomize parameters
     c.min_dev = rand_double(0.3, 1.5);
     c.lookback_recent = rand_int(3, 10);
     c.lookback_season = rand_int(15, 60);
@@ -97,36 +107,144 @@ StrategyConfig Lab::generate_hypothesis(const std::string& queue_type) {
     c.hit_rate_window = rand_int(10, 30);
     c.line_gap_threshold = rand_double(0.2, 1.0);
 
-    // Generate a descriptive name
     char buf[256];
     std::snprintf(buf, sizeof(buf), "meanrev_%s_dev%.1f_lr%d_ls%d_hr%.2f_k%.3f",
                   c.target_stat.c_str(), c.min_dev, c.lookback_recent,
                   c.lookback_season, c.min_hit_rate, c.kelly);
     c.name = buf;
-
     return c;
+}
+
+StrategyConfig Lab::generate_situational_config() {
+    StrategyConfig c;
+    c.type = "situational";
+
+    int pair_idx = rand_int(0, static_cast<int>(MARKET_STAT_PAIRS.size()) - 1);
+    c.target_market = MARKET_STAT_PAIRS[pair_idx].first;
+    c.target_stat = MARKET_STAT_PAIRS[pair_idx].second;
+
+    int side_mode = rand_int(0, 2);
+    if (side_mode == 0)      c.sides = {"OVER", "UNDER"};
+    else if (side_mode == 1) c.sides = {"OVER"};
+    else                     c.sides = {"UNDER"};
+
+    // Shared params
+    c.lookback_recent = rand_int(3, 10);
+    c.lookback_season = rand_int(15, 60);
+    c.min_hit_rate = rand_double(0.35, 0.60);
+    c.min_games = rand_int(8, 25);
+    c.kelly = rand_double(0.01, 0.08);
+    c.max_odds = rand_double(1.5, 4.0);
+    c.hit_rate_window = rand_int(10, 30);
+    c.line_gap_threshold = rand_double(0.2, 1.0);
+
+    // Situational-specific params
+    c.z_thresh = rand_double(0.5, 1.8);
+    c.b2b_enabled = rand_int(0, 1) == 1;
+    c.fatigue_mins = rand_double(28.0, 38.0);
+    c.defense_thresh = rand_double(0.01, 0.06);
+    c.blowout_thresh = rand_double(0.25, 0.50);
+    c.injury_boost = rand_int(0, 1) == 1;
+    c.cold_bounce = rand_int(0, 1) == 1;
+    c.trend_enabled = rand_int(0, 1) == 1;
+    c.consistency_thresh = rand_double(0.3, 0.6);
+    c.min_factors = rand_int(2, 4);
+
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "sit_%s_zt%.1f_mf%d_k%.3f_b2b%d",
+                  c.target_stat.c_str(), c.z_thresh, c.min_factors,
+                  c.kelly, c.b2b_enabled ? 1 : 0);
+    c.name = buf;
+    return c;
+}
+
+StrategyConfig Lab::generate_twostage_config() {
+    StrategyConfig c;
+    c.type = "twostage";
+
+    int pair_idx = rand_int(0, static_cast<int>(MARKET_STAT_PAIRS.size()) - 1);
+    c.target_market = MARKET_STAT_PAIRS[pair_idx].first;
+    c.target_stat = MARKET_STAT_PAIRS[pair_idx].second;
+
+    int side_mode = rand_int(0, 2);
+    if (side_mode == 0)      c.sides = {"OVER", "UNDER"};
+    else if (side_mode == 1) c.sides = {"OVER"};
+    else                     c.sides = {"UNDER"};
+
+    // Shared params
+    c.lookback_recent = rand_int(3, 10);
+    c.lookback_season = rand_int(15, 60);
+    c.min_hit_rate = rand_double(0.35, 0.60);
+    c.min_games = rand_int(8, 25);
+    c.kelly = rand_double(0.01, 0.08);
+    c.max_odds = rand_double(1.5, 4.0);
+    c.hit_rate_window = rand_int(10, 30);
+
+    // Twostage-specific params
+    c.mins_lookback = rand_int(5, 20);
+    c.rate_lookback = rand_int(5, 25);
+    c.b2b_mins_adj = rand_double(0.85, 0.98);
+    c.min_edge = rand_double(0.03, 0.15);
+
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "twostage_%s_ml%d_rl%d_edge%.2f_k%.3f",
+                  c.target_stat.c_str(), c.mins_lookback, c.rate_lookback,
+                  c.min_edge, c.kelly);
+    c.name = buf;
+    return c;
+}
+
+// ---- Unified hypothesis generation ----
+
+StrategyConfig Lab::generate_hypothesis(const std::string& queue_type) {
+    // Distribute across strategy types:
+    // 40% meanrev, 30% situational, 30% twostage
+    int roll = rand_int(1, 100);
+    if (roll <= 40) {
+        return generate_meanrev_config();
+    } else if (roll <= 70) {
+        return generate_situational_config();
+    } else {
+        return generate_twostage_config();
+    }
 }
 
 // ---- Evaluate result and update leaderboard ----
 
 void Lab::evaluate_result(const StrategyConfig& config,
                            const ExperimentResult& result) {
-    if (result.total_bets < 20) return;  // too few bets to be meaningful
+    if (result.total_bets < 20) return;
 
-    std::lock_guard<std::mutex> lock(leaderboard_mutex_);
-    auto& best = leaderboard_[config.target_market];
+    bool updated = knowledge_.update(config.target_market, result, config);
 
-    // Update if better ROI with reasonable p-value
-    if (result.roi > best.roi && result.pvalue < 0.15) {
-        best.roi = result.roi;
-        best.pvalue = result.pvalue;
-        best.bets = result.total_bets;
-        best.config = config;
-
-        printf("\n  ** NEW BEST [%s]: ROI=%.1f%% WR=%.1f%% bets=%d p=%.4f **\n",
-               config.target_market.c_str(),
+    if (updated) {
+        printf("\n  ** NEW BEST [%s] via %s: ROI=%.1f%% WR=%.1f%% bets=%d p=%.4f **\n",
+               config.target_market.c_str(), config.type.c_str(),
                result.roi * 100, result.win_rate * 100,
                result.total_bets, result.pvalue);
+
+        // Persist knowledge base
+        if (!knowledge_path_.empty()) {
+            knowledge_.save(knowledge_path_);
+        }
+
+        // Save bet history for new best
+        if (!result.bets.empty()) {
+            bet_history::save(config.name, result.bets, "results/bet_history");
+        }
+
+        // Send notification if net_roi > 0 (actual profitable result)
+        if (result.roi > 0.0) {
+            char msg[512];
+            std::snprintf(msg, sizeof(msg),
+                "[FROM FEDORA] NBA Lab C++ breakthrough!\n"
+                "Market: %s\nStrategy: %s\n"
+                "ROI: %.1f%% | WR: %.1f%% | Bets: %d | p=%.4f",
+                config.target_market.c_str(), config.name.c_str(),
+                result.roi * 100, result.win_rate * 100,
+                result.total_bets, result.pvalue);
+            notify::send(msg);
+        }
     }
 }
 
@@ -134,11 +252,8 @@ void Lab::evaluate_result(const StrategyConfig& config,
 
 void Lab::log_experiment(const StrategyConfig& config,
                           const ExperimentResult& result) {
-    // Ensure results directories exist
     fs::create_directories("results/lab");
-    fs::create_directories("results/bet_history");
 
-    // Append to experiments.jsonl
     {
         nlohmann::json entry;
         entry["config"] = config.to_json();
@@ -156,31 +271,35 @@ void Lab::log_experiment(const StrategyConfig& config,
         f << entry.dump() << "\n";
     }
 
-    // Save bet history if there are bets
-    if (!result.bets.empty() && !config.name.empty()) {
-        nlohmann::json bets_json = nlohmann::json::array();
-        for (const auto& b : result.bets) {
-            nlohmann::json bj;
-            bj["date"] = b.date;
-            bj["player"] = b.player;
-            bj["stat"] = b.stat;
-            bj["line"] = b.line;
-            bj["side"] = b.side;
-            bj["odds"] = b.odds;
-            bj["bet_size"] = b.bet_size;
-            bj["won"] = b.won;
-            bj["pnl"] = b.pnl;
-            bj["actual"] = b.actual;
-            bets_json.push_back(std::move(bj));
-        }
+    knowledge_.increment_experiments();
+    knowledge_.add_runtime(result.elapsed_seconds / 3600.0);
+}
 
-        std::string path = "results/bet_history/" + config.name + ".jsonl";
-        std::lock_guard<std::mutex> lock(log_mutex_);
-        std::ofstream f(path);
-        for (const auto& bj : bets_json) {
-            f << bj.dump() << "\n";
-        }
+// ---- Print leaderboard ----
+
+void Lab::print_leaderboard() const {
+    auto lb = knowledge_.get_leaderboard();
+    if (lb.empty()) {
+        printf("No leaderboard entries yet.\n");
+        return;
     }
+
+    printf("\n=== KNOWLEDGE BASE LEADERBOARD ===\n");
+    printf("Experiments run: %d | Runtime: %.1f hours\n\n",
+           knowledge_.experiments_run(), knowledge_.total_runtime_hours());
+    printf("%-22s %8s %8s %6s %8s  %s\n",
+           "Market", "ROI%", "WR%", "Bets", "p-value", "Approach");
+    printf("%-22s %8s %8s %6s %8s  %s\n",
+           "------", "----", "---", "----", "-------", "--------");
+
+    for (const auto& [market, entry] : lb) {
+        printf("%-22s %7.1f%% %7.1f%% %6d %8.4f  %s\n",
+               market.c_str(),
+               entry.roi * 100, entry.wr * 100,
+               entry.bets, entry.pvalue,
+               entry.approach.c_str());
+    }
+    printf("\n");
 }
 
 // ---- Run single experiment ----
@@ -203,20 +322,29 @@ void Lab::run_single(const StrategyConfig& config) {
 // ---- Benchmark ----
 
 void Lab::bench(int n) {
-    printf("\n=== BENCHMARK: %d meanrev experiments ===\n", n);
+    printf("\n=== BENCHMARK: %d experiments (meanrev + situational + twostage) ===\n", n);
     printf("Workers: %d fast + %d slow = %d total\n",
            fast_workers_, slow_workers_, fast_workers_ + slow_workers_);
 
-    // Generate all configs upfront
+    // Generate all configs upfront — mixed strategy types
     std::vector<StrategyConfig> configs;
     configs.reserve(n);
     for (int i = 0; i < n; i++) {
         configs.push_back(generate_hypothesis("fast"));
     }
 
+    // Count by type
+    int n_meanrev = 0, n_sit = 0, n_twostage = 0;
+    for (const auto& c : configs) {
+        if (c.type == "meanrev") n_meanrev++;
+        else if (c.type == "situational") n_sit++;
+        else if (c.type == "twostage") n_twostage++;
+    }
+    printf("Mix: %d meanrev, %d situational, %d twostage\n",
+           n_meanrev, n_sit, n_twostage);
+
     auto t0 = std::chrono::high_resolution_clock::now();
 
-    // Parallel execution using a thread pool with a shared queue
     std::atomic<int> next_idx{0};
     std::atomic<int> completed{0};
     std::atomic<double> total_experiment_time{0.0};
@@ -237,7 +365,6 @@ void Lab::bench(int n) {
                 evaluate_result(configs[idx], result);
                 log_experiment(configs[idx], result);
 
-                // Atomic add for total time
                 double prev = total_experiment_time.load();
                 while (!total_experiment_time.compare_exchange_weak(
                     prev, prev + result.elapsed_seconds)) {}
@@ -269,27 +396,23 @@ void Lab::bench(int n) {
            (avg_per * n) / wall_seconds);
 
     // Print leaderboard
-    printf("\n=== LEADERBOARD ===\n");
-    {
-        std::lock_guard<std::mutex> lock(leaderboard_mutex_);
-        for (const auto& [market, best] : leaderboard_) {
-            if (best.bets > 0) {
-                printf("  %s: ROI=%.1f%% bets=%d p=%.4f (%s)\n",
-                       market.c_str(), best.roi * 100, best.bets,
-                       best.pvalue, best.config.name.c_str());
-            }
-        }
+    print_leaderboard();
+
+    // Save knowledge if path is set
+    if (!knowledge_path_.empty()) {
+        knowledge_.save(knowledge_path_);
+        printf("Knowledge saved to: %s\n", knowledge_path_.c_str());
     }
 }
 
 // ---- Run forever ----
 
 void Lab::run() {
-    printf("\n=== NBA LAB — Parallel Experiment Runner ===\n");
+    printf("\n=== NBA LAB -- Parallel Experiment Runner ===\n");
     printf("Fast workers: %d | Slow workers: %d\n", fast_workers_, slow_workers_);
+    printf("Strategies: meanrev, situational, twostage\n");
     printf("Running experiments forever. Press Ctrl+C to stop.\n\n");
 
-    // Two queues: fast (meanrev, situational) and slow (future heavy strategies)
     struct WorkQueue {
         std::queue<StrategyConfig> q;
         std::mutex mtx;
@@ -299,10 +422,8 @@ void Lab::run() {
 
     WorkQueue fast_q, slow_q;
 
-    // Producer: continuously generate hypotheses
     auto producer = [&]() {
         while (!fast_q.stop.load()) {
-            // Keep fast queue fed
             {
                 std::lock_guard<std::mutex> lock(fast_q.mtx);
                 while (fast_q.q.size() < static_cast<size_t>(fast_workers_ * 2)) {
@@ -311,7 +432,6 @@ void Lab::run() {
             }
             fast_q.cv.notify_all();
 
-            // Keep slow queue fed (placeholder for future strategies)
             {
                 std::lock_guard<std::mutex> lock(slow_q.mtx);
                 while (slow_q.q.size() < static_cast<size_t>(slow_workers_ * 2)) {
@@ -324,7 +444,6 @@ void Lab::run() {
         }
     };
 
-    // Worker: pull from queue, run, log, repeat
     auto worker = [&](WorkQueue& wq, const std::string& label) {
         while (!wq.stop.load()) {
             StrategyConfig config;
@@ -348,28 +467,34 @@ void Lab::run() {
 
             evaluate_result(config, result);
             log_experiment(config, result);
+
+            // Periodic save every 50 experiments
+            if (exp_num % 50 == 0 && !knowledge_path_.empty()) {
+                knowledge_.save(knowledge_path_);
+            }
         }
     };
 
-    // Start producer
     std::thread prod_thread(producer);
 
-    // Start fast workers
     std::vector<std::thread> fast_threads;
     for (int i = 0; i < fast_workers_; i++) {
         fast_threads.emplace_back(worker, std::ref(fast_q), "FAST");
     }
 
-    // Start slow workers
     std::vector<std::thread> slow_threads;
     for (int i = 0; i < slow_workers_; i++) {
         slow_threads.emplace_back(worker, std::ref(slow_q), "SLOW");
     }
 
-    // Wait (runs forever until Ctrl+C)
     prod_thread.join();
     for (auto& t : fast_threads) t.join();
     for (auto& t : slow_threads) t.join();
+
+    // Final save
+    if (!knowledge_path_.empty()) {
+        knowledge_.save(knowledge_path_);
+    }
 }
 
 } // namespace nba

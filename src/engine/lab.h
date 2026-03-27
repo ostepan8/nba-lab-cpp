@@ -4,6 +4,7 @@
 #include "../data/store.h"
 #include "../features/player_index.h"
 #include "../features/odds.h"
+#include "../io/knowledge.h"
 #include <memory>
 #include <map>
 #include <mutex>
@@ -19,17 +20,23 @@ public:
         const KalshiCache& kalshi,
         int fast_workers = 6, int slow_workers = 2);
 
-    // Run forever — generates and runs experiments in parallel
+    // Run forever -- generates and runs experiments in parallel
     void run();
 
     // Run a single experiment
     void run_single(const StrategyConfig& config);
 
-    // Benchmark: run N meanrev experiments, report throughput
+    // Benchmark: run N experiments across all strategy types, report throughput
     void bench(int n = 100);
 
     // Generate a random hypothesis for the given queue type
     StrategyConfig generate_hypothesis(const std::string& queue_type);
+
+    // Print the current leaderboard from the knowledge base
+    void print_leaderboard() const;
+
+    // Set the knowledge base path (for persistence)
+    void set_knowledge_path(const std::string& path);
 
 private:
     const DataStore& store_;
@@ -45,15 +52,9 @@ private:
     std::atomic<int> experiments_run_{0};
     std::mutex log_mutex_;
 
-    // Knowledge base: best result per market
-    struct MarketBest {
-        double roi = -999.0;
-        double pvalue = 1.0;
-        int bets = 0;
-        StrategyConfig config;
-    };
-    std::map<std::string, MarketBest> leaderboard_;
-    std::mutex leaderboard_mutex_;
+    // Persistent knowledge base
+    KnowledgeBase knowledge_;
+    std::string knowledge_path_;
 
     // RNG per thread would be better, but for hypothesis generation
     // we protect with mutex
@@ -64,6 +65,11 @@ private:
     double rand_double(double lo, double hi);
     int rand_int(int lo, int hi);
     std::string rand_choice(const std::vector<std::string>& v);
+
+    // Generate configs for specific strategy types
+    StrategyConfig generate_meanrev_config();
+    StrategyConfig generate_situational_config();
+    StrategyConfig generate_twostage_config();
 };
 
 } // namespace nba
