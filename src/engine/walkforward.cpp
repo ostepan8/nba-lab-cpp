@@ -119,27 +119,39 @@ ExperimentResult WalkforwardRunner::run(const StrategyConfig& config,
         }
         result.roi = (total_wagered > 0) ? result.pnl / total_wagered : 0.0;
 
-        // P-value: binomial test approximation
-        // H0: win_rate = break_even_rate (implied by average odds)
-        double avg_odds = 0.0;
-        for (const auto& b : result.bets) avg_odds += b.odds;
-        avg_odds /= result.total_bets;
-        double break_even = 1.0 / avg_odds;  // implied probability
-
+        // P-value: two methods, take the minimum (matches Python)
+        // Method 1: Binomial test — H0: win_rate = 0.5 (same as Python)
         double n = result.total_bets;
-        double p0 = break_even;
-        double obs = result.win_rate;
-
-        // z-test approximation
+        double obs_wr = result.win_rate;
+        double p0 = 0.5;  // Python uses fair_p = 0.5
         double se = std::sqrt(p0 * (1.0 - p0) / n);
+        double pval_binom = 1.0;
         if (se > 1e-9) {
-            double z = (obs - p0) / se;
-            // One-sided p-value using normal CDF approximation
-            // erfc(-z/sqrt(2)) / 2
-            result.pvalue = 0.5 * std::erfc(-z / std::sqrt(2.0));
-            // We want P(X >= observed), which is the upper tail
-            result.pvalue = 1.0 - result.pvalue;
+            double z = (obs_wr - p0) / se;
+            // Upper tail: P(WR >= observed | H0: WR = 0.5)
+            pval_binom = 0.5 * std::erfc(z / std::sqrt(2.0));
         }
+
+        // Method 2: T-test on PnL series — H0: mean PnL = 0
+        double pval_ttest = 1.0;
+        if (n >= 5) {
+            double mean_pnl = result.pnl / n;
+            double var_pnl = 0.0;
+            for (const auto& b : result.bets) {
+                double diff = b.pnl - mean_pnl;
+                var_pnl += diff * diff;
+            }
+            var_pnl /= (n - 1.0);
+            double se_pnl = std::sqrt(var_pnl / n);
+            if (se_pnl > 1e-9) {
+                double t = mean_pnl / se_pnl;
+                // Approximate one-sided p-value from t-statistic
+                // For large n, t ≈ z, so use normal CDF
+                pval_ttest = 0.5 * std::erfc(t / std::sqrt(2.0));
+            }
+        }
+
+        result.pvalue = std::min(pval_binom, pval_ttest);
     }
 
     auto t1 = std::chrono::high_resolution_clock::now();
