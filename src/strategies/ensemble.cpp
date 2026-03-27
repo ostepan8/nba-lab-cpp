@@ -235,7 +235,7 @@ ExperimentResult EnsembleStrategy::run(const StrategyConfig& config,
         // Kelly sizing using averaged hit rate
         double b = dec_odds - 1.0;
         double kelly_frac = (avg_hr * b - (1.0 - avg_hr)) / b;
-        kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
+        kelly_frac = std::max(0.0, std::min(kelly_frac, 0.05));
         if (kelly_frac < 1e-6) return std::nullopt;
 
         // Unanimity boost: if all 3 agree, increase sizing
@@ -252,7 +252,7 @@ ExperimentResult EnsembleStrategy::run(const StrategyConfig& config,
         bet.line = line;
         bet.side = side;
         bet.odds = dec_odds;
-        bet.bet_size = kelly_frac * 1000.0;
+        bet.bet_size = kelly_frac * config.kelly * 1000.0;
 
         return bet;
     };

@@ -72,11 +72,16 @@ ExperimentResult WalkforwardRunner::run(const StrategyConfig& config,
             if (bet_opt.has_value()) {
                 auto& bet = bet_opt.value();
 
-                // Universal kelly cap: 5% of bankroll max per bet
-                double max_kelly_bet = 0.05 * 1000.0;  // 5% of $1000 bankroll
+                // Bet size is kelly fraction — multiply by current bankroll (compounding)
+                // Strategy returns kelly_frac in bet_size field, we scale by bankroll here
+                bet.bet_size = bet.bet_size * result.bankroll / 1000.0;
+
+                // Universal kelly cap: 5% of current bankroll per bet
+                double max_kelly_bet = 0.05 * result.bankroll;
                 if (bet.bet_size > max_kelly_bet) {
                     bet.bet_size = max_kelly_bet;
                 }
+                if (bet.bet_size < 0.50) continue;  // Skip tiny bets
 
                 // Resolve actual outcome from gamelog
                 // The game on `date` should exist at the original index

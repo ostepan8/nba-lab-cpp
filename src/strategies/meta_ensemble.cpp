@@ -200,7 +200,7 @@ ExperimentResult MetaEnsembleStrategy::run(const StrategyConfig& config,
         // Kelly sizing
         double b = dec_odds - 1.0;
         double kelly_frac = (model_prob * b - (1.0 - model_prob)) / b;
-        kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
+        kelly_frac = std::max(0.0, std::min(kelly_frac, 0.05));
         if (kelly_frac < 1e-6) return std::nullopt;
 
         Bet bet;
@@ -210,7 +210,7 @@ ExperimentResult MetaEnsembleStrategy::run(const StrategyConfig& config,
         bet.line = line;
         bet.side = side;
         bet.odds = dec_odds;
-        bet.bet_size = kelly_frac * 1000.0;
+        bet.bet_size = kelly_frac * config.kelly * 1000.0;
 
         return bet;
     };

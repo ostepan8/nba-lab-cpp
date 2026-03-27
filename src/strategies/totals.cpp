@@ -183,14 +183,14 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
             // Kelly sizing
             double b = dec_odds_val - 1.0;
             double kelly_frac = (model_prob * b - (1.0 - model_prob)) / b;
-            kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
+            kelly_frac = std::max(0.0, std::min(kelly_frac, 0.05));
             if (kelly_frac < 1e-6) {
                 hs.games++;
                 as.games++;
                 continue;
             }
 
-            double bet_size = kelly_frac * 1000.0;
+            double bet_size = kelly_frac * config.kelly * 1000.0;
 
             Bet bet;
             bet.date = date;

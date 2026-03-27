@@ -142,14 +142,14 @@ ExperimentResult CompoundStrategy::run(const StrategyConfig& config,
         // Kelly sizing with compound boost
         double b = dec_odds - 1.0;
         double kelly_frac = (primary_sig.hr * b - (1.0 - primary_sig.hr)) / b;
-        kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
+        kelly_frac = std::max(0.0, std::min(kelly_frac, 0.05));
         if (kelly_frac < 1e-6) return std::nullopt;
 
         // Compound boost: more aligned stats → bigger bet, capped at 1.5x
         double boost = 1.0 + 0.15 * (compound_count - 1);
         boost = std::min(boost, 1.5);
         kelly_frac *= boost;
-        kelly_frac = std::min(kelly_frac, config.kelly);
+        kelly_frac = std::min(kelly_frac, 0.05);
 
         Bet bet;
         bet.date = date;
@@ -158,7 +158,7 @@ ExperimentResult CompoundStrategy::run(const StrategyConfig& config,
         bet.line = line;
         bet.side = side;
         bet.odds = dec_odds;
-        bet.bet_size = kelly_frac * 1000.0;
+        bet.bet_size = kelly_frac * config.kelly * 1000.0;
 
         return bet;
     };

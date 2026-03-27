@@ -158,7 +158,7 @@ ExperimentResult TwostageStrategy::run(const StrategyConfig& config,
         // Kelly criterion with edge scaling
         double b = dec_odds - 1.0;
         double kelly_frac = (hr * b - (1.0 - hr)) / b;
-        kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
+        kelly_frac = std::max(0.0, std::min(kelly_frac, 0.05));
         if (kelly_frac < 1e-6) return std::nullopt;
 
         // Scale Kelly by edge magnitude (bigger edge = more conviction)
@@ -166,7 +166,7 @@ ExperimentResult TwostageStrategy::run(const StrategyConfig& config,
         kelly_frac *= edge_mult;
         kelly_frac = std::min(kelly_frac, config.kelly * 2.0);
 
-        double bet_size = kelly_frac * 1000.0;
+        double bet_size = kelly_frac * config.kelly * 1000.0;
 
         Bet bet;
         bet.date = date;

@@ -181,11 +181,11 @@ ExperimentResult ResidualStrategy::run(const StrategyConfig& config,
         // Kelly sizing
         double b = dec_odds - 1.0;
         double kelly_frac = (hr * b - (1.0 - hr)) / b;
-        kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
+        kelly_frac = std::max(0.0, std::min(kelly_frac, 0.05));
         if (kelly_frac < 1e-6) return std::nullopt;
 
         // No consistency boost — cap kelly at config.kelly to avoid overconfidence
-        kelly_frac = std::min(kelly_frac, config.kelly);
+        kelly_frac = std::min(kelly_frac, 0.05);
 
         Bet bet;
         bet.date = date;
@@ -194,7 +194,7 @@ ExperimentResult ResidualStrategy::run(const StrategyConfig& config,
         bet.line = line;
         bet.side = side;
         bet.odds = dec_odds;
-        bet.bet_size = kelly_frac * 1000.0;
+        bet.bet_size = kelly_frac * config.kelly * 1000.0;
 
         return bet;
     };
