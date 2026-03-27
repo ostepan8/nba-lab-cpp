@@ -36,6 +36,10 @@ private:
     StrategyConfig generate_compound();
     StrategyConfig generate_residual();
     StrategyConfig generate_ensemble();
+    StrategyConfig generate_timeseries();
+    StrategyConfig generate_neural_props();
+    StrategyConfig generate_spreads();
+    StrategyConfig generate_totals();
 };
 
 } // namespace nba

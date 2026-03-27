@@ -37,6 +37,10 @@ LabConfig LabConfig::defaults() {
     c.compound_weight    = 0.03;
     c.residual_weight    = 0.03;
     c.ensemble_weight    = 0.04;
+    c.timeseries_weight  = 0.05;
+    c.neural_weight      = 0.05;
+    c.spreads_weight     = 0.03;
+    c.totals_weight      = 0.02;
     c.notify_enabled   = true;
     c.notify_min_roi   = 0.0;
     c.kalshi_fee_rate  = 0.038;
@@ -85,6 +89,10 @@ LabConfig LabConfig::load(const std::string& path) {
     if (j.contains("compound_weight"))    c.compound_weight    = j["compound_weight"].get<double>();
     if (j.contains("residual_weight"))    c.residual_weight    = j["residual_weight"].get<double>();
     if (j.contains("ensemble_weight"))    c.ensemble_weight    = j["ensemble_weight"].get<double>();
+    if (j.contains("timeseries_weight"))  c.timeseries_weight  = j["timeseries_weight"].get<double>();
+    if (j.contains("neural_weight"))      c.neural_weight      = j["neural_weight"].get<double>();
+    if (j.contains("spreads_weight"))     c.spreads_weight     = j["spreads_weight"].get<double>();
+    if (j.contains("totals_weight"))      c.totals_weight      = j["totals_weight"].get<double>();
     if (j.contains("notify_enabled"))     c.notify_enabled     = j["notify_enabled"].get<bool>();
     if (j.contains("notify_min_roi"))     c.notify_min_roi     = j["notify_min_roi"].get<double>();
     if (j.contains("kalshi_fee_rate"))    c.kalshi_fee_rate    = j["kalshi_fee_rate"].get<double>();
@@ -97,7 +105,9 @@ LabConfig LabConfig::load(const std::string& path) {
     double total = c.meanrev_weight + c.situational_weight + c.twostage_weight
                  + c.crossmarket_weight + c.meta_weight + c.bayesian_weight
                  + c.ml_props_weight + c.moneyline_weight + c.compound_weight
-                 + c.residual_weight + c.ensemble_weight;
+                 + c.residual_weight + c.ensemble_weight
+                 + c.timeseries_weight + c.neural_weight + c.spreads_weight
+                 + c.totals_weight;
     if (total < 1e-9) {
         // Reset to defaults
         auto def = defaults();
@@ -112,6 +122,10 @@ LabConfig LabConfig::load(const std::string& path) {
         c.compound_weight    = def.compound_weight;
         c.residual_weight    = def.residual_weight;
         c.ensemble_weight    = def.ensemble_weight;
+        c.timeseries_weight  = def.timeseries_weight;
+        c.neural_weight      = def.neural_weight;
+        c.spreads_weight     = def.spreads_weight;
+        c.totals_weight      = def.totals_weight;
     }
 
     printf("Config loaded from: %s\n", path.c_str());
@@ -143,6 +157,10 @@ void LabConfig::save(const std::string& path) const {
     j["compound_weight"]    = compound_weight;
     j["residual_weight"]    = residual_weight;
     j["ensemble_weight"]    = ensemble_weight;
+    j["timeseries_weight"]  = timeseries_weight;
+    j["neural_weight"]      = neural_weight;
+    j["spreads_weight"]     = spreads_weight;
+    j["totals_weight"]      = totals_weight;
     j["notify_enabled"]     = notify_enabled;
     j["notify_min_roi"]     = notify_min_roi;
     j["kalshi_fee_rate"]    = kalshi_fee_rate;

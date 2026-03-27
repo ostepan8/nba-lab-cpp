@@ -14,7 +14,8 @@ struct StrategyConfig {
     std::string name;
     std::string type;           // "meanrev", "situational", "twostage", "crossmarket",
                                  // "meta_ensemble", "bayesian", "ml_props", "moneyline",
-                                 // "compound", "residual", "ensemble"
+                                 // "compound", "residual", "ensemble", "timeseries",
+                                 // "neural_props", "spreads", "totals"
     std::string target_stat;    // "PTS", "REB", "AST", "FG3M", "STL", "BLK"
     std::string target_market;  // "player_points", "player_rebounds", etc.
     std::vector<std::string> sides;  // {"OVER","UNDER"} or {"UNDER"}
@@ -45,6 +46,25 @@ struct StrategyConfig {
     int rate_lookback = 15;       // window for per-minute rate
     double b2b_mins_adj = 0.92;   // B2B minutes multiplier (default -8%)
     double min_edge = 0.08;       // minimum prediction-vs-line edge to bet
+
+    // Timeseries (EWMA) strategy params
+    double fast_alpha = 0.3;
+    double medium_alpha = 0.1;
+    double slow_alpha = 0.03;
+    double fast_weight = 0.5;
+    double medium_weight = 0.3;
+    double slow_weight = 0.2;
+
+    // Neural/KNN strategy params
+    int k_neighbors = 5;
+    int seq_len = 10;
+
+    // Spreads/Totals strategy params
+    double elo_k = 30.0;
+    double home_advantage = 3.5;
+    double min_edge_points = 2.0;
+    int pace_window = 10;
+    int ortg_window = 10;
 
     nlohmann::json to_json() const {
         nlohmann::json j;
@@ -78,6 +98,22 @@ struct StrategyConfig {
         j["rate_lookback"] = rate_lookback;
         j["b2b_mins_adj"] = b2b_mins_adj;
         j["min_edge"] = min_edge;
+        // Timeseries
+        j["fast_alpha"] = fast_alpha;
+        j["medium_alpha"] = medium_alpha;
+        j["slow_alpha"] = slow_alpha;
+        j["fast_weight"] = fast_weight;
+        j["medium_weight"] = medium_weight;
+        j["slow_weight"] = slow_weight;
+        // Neural/KNN
+        j["k_neighbors"] = k_neighbors;
+        j["seq_len"] = seq_len;
+        // Spreads/Totals
+        j["elo_k"] = elo_k;
+        j["home_advantage"] = home_advantage;
+        j["min_edge_points"] = min_edge_points;
+        j["pace_window"] = pace_window;
+        j["ortg_window"] = ortg_window;
         return j;
     }
 
@@ -113,6 +149,22 @@ struct StrategyConfig {
         if (j.contains("rate_lookback"))     c.rate_lookback = j["rate_lookback"].get<int>();
         if (j.contains("b2b_mins_adj"))      c.b2b_mins_adj = j["b2b_mins_adj"].get<double>();
         if (j.contains("min_edge"))          c.min_edge = j["min_edge"].get<double>();
+        // Timeseries
+        if (j.contains("fast_alpha"))        c.fast_alpha = j["fast_alpha"].get<double>();
+        if (j.contains("medium_alpha"))      c.medium_alpha = j["medium_alpha"].get<double>();
+        if (j.contains("slow_alpha"))        c.slow_alpha = j["slow_alpha"].get<double>();
+        if (j.contains("fast_weight"))       c.fast_weight = j["fast_weight"].get<double>();
+        if (j.contains("medium_weight"))     c.medium_weight = j["medium_weight"].get<double>();
+        if (j.contains("slow_weight"))       c.slow_weight = j["slow_weight"].get<double>();
+        // Neural/KNN
+        if (j.contains("k_neighbors"))       c.k_neighbors = j["k_neighbors"].get<int>();
+        if (j.contains("seq_len"))           c.seq_len = j["seq_len"].get<int>();
+        // Spreads/Totals
+        if (j.contains("elo_k"))             c.elo_k = j["elo_k"].get<double>();
+        if (j.contains("home_advantage"))    c.home_advantage = j["home_advantage"].get<double>();
+        if (j.contains("min_edge_points"))   c.min_edge_points = j["min_edge_points"].get<double>();
+        if (j.contains("pace_window"))       c.pace_window = j["pace_window"].get<int>();
+        if (j.contains("ortg_window"))       c.ortg_window = j["ortg_window"].get<int>();
         return c;
     }
 };

@@ -28,6 +28,10 @@ struct LabConfig {
     double compound_weight = 0.03;
     double residual_weight = 0.03;
     double ensemble_weight = 0.04;
+    double timeseries_weight = 0.05;
+    double neural_weight = 0.05;
+    double spreads_weight = 0.03;
+    double totals_weight = 0.02;
 
     // Notification
     bool notify_enabled = true;

@@ -10,6 +10,10 @@
 #include "../strategies/compound.h"
 #include "../strategies/residual.h"
 #include "../strategies/ensemble.h"
+#include "../strategies/timeseries.h"
+#include "../strategies/neural_props.h"
+#include "../strategies/spreads.h"
+#include "../strategies/totals.h"
 #include "../io/bet_history.h"
 #include "../io/notify.h"
 #include <nlohmann/json.hpp>
@@ -46,6 +50,10 @@ std::unique_ptr<Strategy> Lab::create_strategy(const std::string& type) {
     if (type == "compound")       return std::make_unique<CompoundStrategy>();
     if (type == "residual")       return std::make_unique<ResidualStrategy>();
     if (type == "ensemble")       return std::make_unique<EnsembleStrategy>();
+    if (type == "timeseries")     return std::make_unique<TimeseriesStrategy>();
+    if (type == "neural_props")   return std::make_unique<NeuralPropsStrategy>();
+    if (type == "spreads")        return std::make_unique<SpreadsStrategy>();
+    if (type == "totals")         return std::make_unique<TotalsStrategy>();
     return std::make_unique<MeanRevStrategy>();
 }
 
@@ -197,14 +205,17 @@ void Lab::run() {
     printf("\n=== NBA LAB v1.0 -- Parallel Experiment Runner ===\n");
     printf("Fast workers: %d | Slow workers: %d | Total: %d\n",
            config_.fast_workers, config_.slow_workers, nw);
-    printf("Weights: mr=%.0f%% sit=%.0f%% ts=%.0f%% xm=%.0f%% meta=%.0f%% "
-           "bay=%.0f%% mlp=%.0f%% ml=%.0f%% cmp=%.0f%% res=%.0f%% ens=%.0f%%\n",
+    printf("Weights: mr=%.0f%% sit=%.0f%% ts2=%.0f%% xm=%.0f%% meta=%.0f%% "
+           "bay=%.0f%% mlp=%.0f%% ml=%.0f%% cmp=%.0f%% res=%.0f%% ens=%.0f%% "
+           "tseries=%.0f%% neural=%.0f%% spr=%.0f%% tot=%.0f%%\n",
            config_.meanrev_weight * 100, config_.situational_weight * 100,
            config_.twostage_weight * 100, config_.crossmarket_weight * 100,
            config_.meta_weight * 100, config_.bayesian_weight * 100,
            config_.ml_props_weight * 100, config_.moneyline_weight * 100,
            config_.compound_weight * 100, config_.residual_weight * 100,
-           config_.ensemble_weight * 100);
+           config_.ensemble_weight * 100, config_.timeseries_weight * 100,
+           config_.neural_weight * 100, config_.spreads_weight * 100,
+           config_.totals_weight * 100);
     printf("Output:  %s\n", config_.output_dir.c_str());
     printf("Running experiments. Press Ctrl+C for graceful shutdown.\n\n");
 

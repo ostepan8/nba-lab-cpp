@@ -28,9 +28,6 @@ int HypothesisGenerator::rand_int(int lo, int hi) {
 }
 
 StrategyConfig HypothesisGenerator::generate(const std::string& /*queue_type*/) {
-    // Weights: meanrev 20%, situational 15%, twostage 10%, crossmarket 15%,
-    //          meta 10%, bayesian 10%, ml_props 5%, moneyline 5%,
-    //          compound 3%, residual 3%, ensemble 4%
     double w_meanrev     = config_.meanrev_weight;
     double w_situational = config_.situational_weight;
     double w_twostage    = config_.twostage_weight;
@@ -42,10 +39,15 @@ StrategyConfig HypothesisGenerator::generate(const std::string& /*queue_type*/) 
     double w_compound    = config_.compound_weight;
     double w_residual    = config_.residual_weight;
     double w_ensemble    = config_.ensemble_weight;
+    double w_timeseries  = config_.timeseries_weight;
+    double w_neural      = config_.neural_weight;
+    double w_spreads     = config_.spreads_weight;
+    double w_totals      = config_.totals_weight;
 
     double total = w_meanrev + w_situational + w_twostage + w_crossmarket
                  + w_meta + w_bayesian + w_ml_props + w_moneyline
-                 + w_compound + w_residual + w_ensemble;
+                 + w_compound + w_residual + w_ensemble
+                 + w_timeseries + w_neural + w_spreads + w_totals;
 
     double r = rand_double(0.0, total);
 
@@ -60,7 +62,11 @@ StrategyConfig HypothesisGenerator::generate(const std::string& /*queue_type*/) 
     cum += w_moneyline;   if (r < cum) return generate_moneyline();
     cum += w_compound;    if (r < cum) return generate_compound();
     cum += w_residual;    if (r < cum) return generate_residual();
-    return generate_ensemble();
+    cum += w_ensemble;    if (r < cum) return generate_ensemble();
+    cum += w_timeseries;  if (r < cum) return generate_timeseries();
+    cum += w_neural;      if (r < cum) return generate_neural_props();
+    cum += w_spreads;     if (r < cum) return generate_spreads();
+    return generate_totals();
 }
 
 // Helper: pick a random market/stat pair
@@ -381,6 +387,108 @@ StrategyConfig HypothesisGenerator::generate_ensemble() {
     std::snprintf(buf, sizeof(buf), "ens_%s_dev%.1f_zt%.1f_edge%.2f_k%.3f",
                   c.target_stat.c_str(), c.min_dev, c.z_thresh,
                   c.min_edge, c.kelly);
+    c.name = buf;
+    return c;
+}
+
+StrategyConfig HypothesisGenerator::generate_timeseries() {
+    StrategyConfig c;
+    c.type = "timeseries";
+
+    auto [mkt, stat] = pick_pair([&](int a, int b) { return rand_int(a, b); });
+    c.target_market = mkt;
+    c.target_stat = stat;
+    c.sides = pick_sides([&](int a, int b) { return rand_int(a, b); });
+
+    c.fast_alpha = rand_double(0.15, 0.50);
+    c.medium_alpha = rand_double(0.05, 0.20);
+    c.slow_alpha = rand_double(0.01, 0.08);
+    c.fast_weight = rand_double(0.2, 0.7);
+    c.medium_weight = rand_double(0.1, 0.5);
+    c.slow_weight = rand_double(0.05, 0.4);
+
+    c.min_games = rand_int(10, 25);
+    c.min_hit_rate = rand_double(0.40, 0.60);
+    c.kelly = rand_double(0.01, 0.08);
+    c.max_odds = rand_double(1.5, 3.5);
+    c.hit_rate_window = rand_int(10, 30);
+    c.min_edge = rand_double(0.03, 0.15);
+
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "ts_%s_fa%.2f_ma%.2f_sa%.2f_k%.3f",
+                  c.target_stat.c_str(), c.fast_alpha,
+                  c.medium_alpha, c.slow_alpha, c.kelly);
+    c.name = buf;
+    return c;
+}
+
+StrategyConfig HypothesisGenerator::generate_neural_props() {
+    StrategyConfig c;
+    c.type = "neural_props";
+
+    auto [mkt, stat] = pick_pair([&](int a, int b) { return rand_int(a, b); });
+    c.target_market = mkt;
+    c.target_stat = stat;
+    c.sides = pick_sides([&](int a, int b) { return rand_int(a, b); });
+
+    c.k_neighbors = rand_int(3, 15);
+    c.seq_len = rand_int(5, 20);
+    c.min_games = rand_int(10, 25);
+    c.min_hit_rate = rand_double(0.40, 0.60);
+    c.kelly = rand_double(0.01, 0.08);
+    c.max_odds = rand_double(1.5, 3.5);
+    c.hit_rate_window = rand_int(10, 30);
+    c.min_edge = rand_double(0.03, 0.15);
+
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "knn_%s_k%d_seq%d_edge%.2f_k%.3f",
+                  c.target_stat.c_str(), c.k_neighbors,
+                  c.seq_len, c.min_edge, c.kelly);
+    c.name = buf;
+    return c;
+}
+
+StrategyConfig HypothesisGenerator::generate_spreads() {
+    StrategyConfig c;
+    c.type = "spreads";
+
+    c.target_market = "spreads";
+    c.target_stat = "SPREAD";
+    c.sides = {"OVER", "UNDER"};  // HOME/AWAY mapped to OVER/UNDER
+
+    c.elo_k = rand_double(15.0, 50.0);
+    c.home_advantage = rand_double(1.5, 5.5);
+    c.min_edge_points = rand_double(1.0, 4.0);
+    c.min_games = rand_int(10, 30);
+    c.kelly = rand_double(0.01, 0.06);
+    c.max_odds = rand_double(1.5, 4.0);
+
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "spreads_elo%.0f_ha%.1f_edge%.1f_k%.3f",
+                  c.elo_k, c.home_advantage, c.min_edge_points, c.kelly);
+    c.name = buf;
+    return c;
+}
+
+StrategyConfig HypothesisGenerator::generate_totals() {
+    StrategyConfig c;
+    c.type = "totals";
+
+    c.target_market = "totals";
+    c.target_stat = "TOTAL";
+    c.sides = {"OVER", "UNDER"};
+
+    c.pace_window = rand_int(5, 20);
+    c.ortg_window = rand_int(5, 20);
+    c.min_edge_points = rand_double(1.0, 5.0);
+    c.min_games = rand_int(10, 30);
+    c.kelly = rand_double(0.01, 0.06);
+    c.max_odds = rand_double(1.5, 4.0);
+
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "totals_pw%d_ow%d_edge%.1f_k%.3f",
+                  c.pace_window, c.ortg_window,
+                  c.min_edge_points, c.kelly);
     c.name = buf;
     return c;
 }
