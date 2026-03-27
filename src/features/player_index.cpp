@@ -31,7 +31,7 @@ int PlayerStats::find_date_index(const std::string& date) const {
 // ---------- Extract opponent from matchup string ----------
 // "DEN vs. NYK" → "NYK",  "DEN @ PHX" → "PHX"
 static std::string extract_opponent(const std::string& matchup,
-                                     const std::string& team) {
+                                     const std::string& /*team*/) {
     // Try "vs."
     auto vs_pos = matchup.find("vs.");
     if (vs_pos != std::string::npos) {
