@@ -138,7 +138,8 @@ ExperimentResult NeuralPropsStrategy::run(const StrategyConfig& config,
         allow_under = true;
     }
 
-    const int K = config.k_neighbors;
+    // Minimum k_neighbors of 5 to prevent extreme predictions from few neighbors
+    const int K = std::max(5, config.k_neighbors);
     const int seq_len = config.seq_len;
 
     auto callback = [&](const PlayerStats& player, int end_idx,
@@ -168,8 +169,17 @@ ExperimentResult NeuralPropsStrategy::run(const StrategyConfig& config,
         if (static_cast<int>(history.size()) < K) return std::nullopt;
 
         // KNN prediction
-        double prediction = knn_predict(history, *query_ctx, K);
-        if (prediction < 0.1) return std::nullopt;
+        double knn_pred = knn_predict(history, *query_ctx, K);
+        if (knn_pred < 0.1) return std::nullopt;
+
+        // Blend prediction with season average (70% KNN + 30% season avg)
+        double season_avg = features::rolling_avg(vals, end_idx, config.lookback_season);
+        double prediction = 0.7 * knn_pred + 0.3 * season_avg;
+
+        // Cap predicted value: can't differ from line by more than 50%
+        double max_pred = line * 1.5;
+        double min_pred = line * 0.5;
+        prediction = std::max(min_pred, std::min(max_pred, prediction));
 
         // Edge calculation
         double edge = (prediction - line) / std::max(line, 0.5);

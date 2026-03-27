@@ -117,8 +117,9 @@ ExperimentResult BayesianStrategy::run(const StrategyConfig& config,
     }
 
     // Bayesian params: prior_strength controls shrinkage
-    // Use min_factors as a proxy for prior_strength (range ~2-10)
-    double prior_strength = static_cast<double>(config.min_factors) * 2.0;
+    // Use min_factors as a proxy for prior_strength, but enforce minimum of 10
+    // to prevent the posterior from being too easily swayed by small samples
+    double prior_strength = std::max(10.0, static_cast<double>(config.min_factors) * 2.0);
     // Decay rate for recency weighting
     double decay = 0.05;
 
@@ -126,6 +127,8 @@ ExperimentResult BayesianStrategy::run(const StrategyConfig& config,
                          double line, double over_odds_ml, double under_odds_ml,
                          const std::string& date) -> std::optional<Bet> {
         if (end_idx < config.min_games) return std::nullopt;
+        // Require minimum 30 games in the posterior window to avoid small-sample overconfidence
+        if (end_idx < 30) return std::nullopt;
 
         const auto& vals = player.get_stat(stat_name);
 
@@ -134,8 +137,10 @@ ExperimentResult BayesianStrategy::run(const StrategyConfig& config,
                                                 config.lookback_season,
                                                 prior_strength, decay);
 
-        double p_over = post.prob_over();
-        double p_under = post.prob_under();
+        // Shrinkage: blend posterior with 50% prior to prevent extreme probabilities
+        double raw_p_over = post.prob_over();
+        double p_over = raw_p_over * 0.7 + 0.5 * 0.3;
+        double p_under = 1.0 - p_over;
 
         // Uncertainty filter: skip if posterior is too uncertain
         double unc = post.uncertainty();
@@ -176,16 +181,11 @@ ExperimentResult BayesianStrategy::run(const StrategyConfig& config,
         double edge = model_prob - implied;
         if (edge < config.min_edge) return std::nullopt;
 
-        // Kelly sizing using posterior probability
+        // Kelly sizing using posterior probability — no confidence boost
         double b = dec_odds - 1.0;
         double kelly_frac = (model_prob * b - (1.0 - model_prob)) / b;
         kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
         if (kelly_frac < 1e-6) return std::nullopt;
-
-        // Scale by confidence: less uncertainty → bigger bet
-        double conf_mult = std::max(0.5, 1.0 - unc * 5.0);
-        kelly_frac *= conf_mult;
-        kelly_frac = std::min(kelly_frac, config.kelly * 2.0);
 
         Bet bet;
         bet.date = date;

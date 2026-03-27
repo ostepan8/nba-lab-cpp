@@ -42,7 +42,8 @@ static ResidualStats compute_residuals(const std::vector<double>& vals,
     int n = std::min(end_idx, (int)vals.size());
     int start = std::max(0, n - window);
     int count = n - start;
-    if (count < 3) return rs;
+    // Require minimum 20 games of residual history
+    if (count < 20) return rs;
 
     // Compute residuals: actual - line
     std::vector<double> residuals;
@@ -51,27 +52,55 @@ static ResidualStats compute_residuals(const std::vector<double>& vals,
         residuals.push_back(vals[i] - line);
     }
 
-    // Mean residual
-    double sum = 0.0;
-    for (double r : residuals) sum += r;
-    rs.mean_residual = sum / count;
+    // Compute raw mean and std first for trimming
+    double raw_sum = 0.0;
+    for (double r : residuals) raw_sum += r;
+    double raw_mean = raw_sum / count;
+    double raw_sq_sum = 0.0;
+    for (double r : residuals) {
+        double diff = r - raw_mean;
+        raw_sq_sum += diff * diff;
+    }
+    double raw_std = std::sqrt(raw_sq_sum / count);
 
-    // Weighted mean (recency-weighted)
+    // Trimmed mean: remove outlier residuals beyond 2 std devs before averaging
+    std::vector<double> trimmed;
+    trimmed.reserve(count);
+    for (double r : residuals) {
+        if (raw_std < 1e-9 || std::abs(r - raw_mean) <= 2.0 * raw_std) {
+            trimmed.push_back(r);
+        }
+    }
+    if (trimmed.empty()) return rs;
+
+    // Mean residual from trimmed data
+    double sum = 0.0;
+    for (double r : trimmed) sum += r;
+    rs.mean_residual = sum / trimmed.size();
+
+    // Weighted mean (recency-weighted) from full data, but cap at 2 std devs
     double wsum = 0.0, wtotal = 0.0;
     for (int i = 0; i < count; ++i) {
+        double capped = std::max(-2.0 * raw_std, std::min(2.0 * raw_std, residuals[i]));
         double w = static_cast<double>(i + 1);
-        wsum += residuals[i] * w;
+        wsum += capped * w;
         wtotal += w;
     }
     rs.weighted_residual = (wtotal > 1e-9) ? wsum / wtotal : 0.0;
 
-    // Residual std
+    // Cap predicted residual at 2 standard deviations
+    if (raw_std > 1e-9) {
+        rs.weighted_residual = std::max(-2.0 * raw_std, std::min(2.0 * raw_std, rs.weighted_residual));
+        rs.mean_residual = std::max(-2.0 * raw_std, std::min(2.0 * raw_std, rs.mean_residual));
+    }
+
+    // Residual std from trimmed data
     double sq_sum = 0.0;
-    for (double r : residuals) {
+    for (double r : trimmed) {
         double diff = r - rs.mean_residual;
         sq_sum += diff * diff;
     }
-    rs.residual_std = std::sqrt(sq_sum / count);
+    rs.residual_std = std::sqrt(sq_sum / trimmed.size());
 
     // Consistency: fraction of residuals with the same sign as the mean
     int same_sign = 0;
@@ -155,10 +184,8 @@ ExperimentResult ResidualStrategy::run(const StrategyConfig& config,
         kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
         if (kelly_frac < 1e-6) return std::nullopt;
 
-        // Consistency bonus: higher consistency → bigger bet
-        double consistency_mult = std::min(1.5, rs.consistency / config.consistency_thresh);
-        kelly_frac *= consistency_mult;
-        kelly_frac = std::min(kelly_frac, config.kelly * 2.0);
+        // No consistency boost — cap kelly at config.kelly to avoid overconfidence
+        kelly_frac = std::min(kelly_frac, config.kelly);
 
         Bet bet;
         bet.date = date;

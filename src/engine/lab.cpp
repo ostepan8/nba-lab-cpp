@@ -61,9 +61,17 @@ void Lab::request_stop() { running_.store(false); }
 
 void Lab::evaluate_result(const StrategyConfig& config,
                            const ExperimentResult& result) {
-    if (result.total_bets < 20) return;
+    if (result.total_bets < 30) return;
 
     double net_roi = result.roi - config_.kalshi_fee_rate;
+
+    // Sanity check: flag suspicious results with ROI > 25%
+    if (net_roi > 0.25) {
+        printf("  [SUSPICIOUS] %s (%s): %.1f%% ROI with %d bets — likely overfit\n",
+               config.target_market.c_str(), config.type.c_str(),
+               net_roi * 100, result.total_bets);
+        return;  // Do not save suspicious results
+    }
 
     // Only save proven configs (p < 0.05, net ROI > 0)
     if (result.pvalue >= 0.05 || net_roi <= 0) return;

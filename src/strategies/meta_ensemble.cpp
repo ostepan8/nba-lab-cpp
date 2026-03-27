@@ -162,8 +162,12 @@ ExperimentResult MetaEnsembleStrategy::run(const StrategyConfig& config,
                         + w_autocorr * sig.autocorr_signal * sig.z_signal
                         + w_consistency * sig.consistency_signal * sig.z_signal;
 
-        // Convert to probability via sigmoid
-        double prob_over = 1.0 / (1.0 + std::exp(-combined));
+        // Normalize combined signal to [-1, 1] range before sigmoid
+        combined = std::max(-1.0, std::min(1.0, combined));
+
+        // Convert to probability via sigmoid, then clamp to [0.35, 0.65]
+        double prob_over_raw = 1.0 / (1.0 + std::exp(-combined));
+        double prob_over = std::max(0.35, std::min(0.65, prob_over_raw));
         double prob_under = 1.0 - prob_over;
 
         std::string side;

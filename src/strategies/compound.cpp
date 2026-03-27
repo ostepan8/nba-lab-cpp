@@ -125,7 +125,9 @@ ExperimentResult CompoundStrategy::run(const StrategyConfig& config,
             }
         }
 
-        // Require at least min_factors stats to agree
+        // Require at least 2 stats to align (not just 1 strong one)
+        // Also respect min_factors from config
+        if (compound_count < 2) return std::nullopt;
         if (compound_count < config.min_factors) return std::nullopt;
 
         std::string side = primary_sig.suggested_side;
@@ -143,11 +145,11 @@ ExperimentResult CompoundStrategy::run(const StrategyConfig& config,
         kelly_frac = std::max(0.0, std::min(kelly_frac, config.kelly));
         if (kelly_frac < 1e-6) return std::nullopt;
 
-        // Compound boost: more aligned stats → bigger bet
-        double boost = 1.0 + 0.25 * (compound_count - 1);
-        boost = std::min(boost, 2.5);
+        // Compound boost: more aligned stats → bigger bet, capped at 1.5x
+        double boost = 1.0 + 0.15 * (compound_count - 1);
+        boost = std::min(boost, 1.5);
         kelly_frac *= boost;
-        kelly_frac = std::min(kelly_frac, config.kelly * 3.0);
+        kelly_frac = std::min(kelly_frac, config.kelly);
 
         Bet bet;
         bet.date = date;

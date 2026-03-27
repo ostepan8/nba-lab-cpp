@@ -98,7 +98,9 @@ static double predict_prob_over(const CrossFeatures& f) {
     score += 0.10 * (f.per_min_rate * f.avg_mins - f.season_avg) /
              std::max(f.season_avg, 1.0);      // production rate signal
 
-    return sigmoid(score);
+    // Clamp to [0.3, 0.7] — no model should be more than 70% confident
+    double raw = sigmoid(score);
+    return std::max(0.3, std::min(0.7, raw));
 }
 
 ExperimentResult CrossMarketStrategy::run(const StrategyConfig& config,

@@ -26,6 +26,7 @@ void KnowledgeBase::load(const std::string& path) {
     if (j.contains("total_runtime_hours"))
         total_runtime_hours_ = j["total_runtime_hours"].get<double>();
 
+    int skipped = 0;
     if (j.contains("all_proven") && j["all_proven"].is_array()) {
         for (auto& val : j["all_proven"]) {
             ProvenConfig pc;
@@ -39,8 +40,16 @@ void KnowledgeBase::load(const std::string& path) {
             if (val.contains("wr"))        pc.wr = val["wr"].get<double>();
             if (val.contains("config"))    pc.config = val["config"];
             if (val.contains("timestamp")) pc.timestamp = val["timestamp"].get<std::string>();
+            // Filter out old inflated results: skip ROI > 25% or fewer than 30 bets
+            if (pc.net_roi > 0.25 || pc.bets < 30) {
+                skipped++;
+                continue;
+            }
             all_proven_.push_back(pc);
         }
+    }
+    if (skipped > 0) {
+        printf("  KnowledgeBase: filtered %d stale entries (ROI>25%% or <30 bets)\n", skipped);
     }
 
     // Initialize prev tops so first run doesn't spam
