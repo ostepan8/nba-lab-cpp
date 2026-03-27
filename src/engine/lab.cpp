@@ -62,27 +62,55 @@ void Lab::request_stop() { running_.store(false); }
 void Lab::evaluate_result(const StrategyConfig& config,
                            const ExperimentResult& result) {
     if (result.total_bets < 20) return;
-    bool updated = knowledge_.update(config.target_market, result, config);
-    if (!updated) return;
 
-    printf("\n  ** NEW BEST [%s] via %s: ROI=%.1f%% WR=%.1f%% bets=%d p=%.4f **\n",
+    double net_roi = result.roi - config_.kalshi_fee_rate;
+
+    // Only save proven configs (p < 0.05, net ROI > 0)
+    if (result.pvalue >= 0.05 || net_roi <= 0) return;
+
+    ProvenConfig pc;
+    pc.market = config.target_market;
+    pc.approach = config.type;
+    pc.name = config.name;
+    pc.roi = result.roi;
+    pc.net_roi = net_roi;
+    pc.pvalue = result.pvalue;
+    pc.bets = result.total_bets;
+    pc.wr = result.win_rate;
+    pc.config = config.to_json();
+
+    bool top_changed = knowledge_.add_proven(pc);
+
+    printf("\n  ** PROVEN [%s] %s: %.1f%% net | %d bets | p=%.4f **\n",
            config.target_market.c_str(), config.type.c_str(),
-           result.roi * 100, result.win_rate * 100,
-           result.total_bets, result.pvalue);
+           net_roi * 100, result.total_bets, result.pvalue);
 
     if (!config_.knowledge_path.empty())
         knowledge_.save(config_.knowledge_path);
     if (!result.bets.empty())
         bet_history::save(config.name, result.bets, config_.output_dir + "/bet_history");
-    if (config_.notify_enabled && result.roi > config_.notify_min_roi) {
-        char msg[512];
-        std::snprintf(msg, sizeof(msg),
-            "[FROM FEDORA] NBA Lab C++ breakthrough!\n"
-            "Market: %s\nStrategy: %s\n"
-            "ROI: %.1f%% | WR: %.1f%% | Bets: %d | p=%.4f",
-            config.target_market.c_str(), config.name.c_str(),
-            result.roi * 100, result.win_rate * 100,
-            result.total_bets, result.pvalue);
+
+    // Only notify when top 5 of either leaderboard changes
+    if (top_changed && config_.notify_enabled) {
+        auto roi_top = knowledge_.top_by_roi(5);
+        auto sig_top = knowledge_.top_by_significance(5);
+
+        std::string msg = "[FROM FEDORA] TOP 10 CHANGED\n\nHIGHEST ROI:\n";
+        for (int i = 0; i < (int)roi_top.size(); i++) {
+            auto& e = roi_top[i];
+            char line[256];
+            std::snprintf(line, sizeof(line), "%d. %s (%s): %.1f%% net | %d bets | p=%.4f\n",
+                i+1, e.market.c_str(), e.approach.c_str(), e.net_roi*100, e.bets, e.pvalue);
+            msg += line;
+        }
+        msg += "\nMOST SIGNIFICANT:\n";
+        for (int i = 0; i < (int)sig_top.size(); i++) {
+            auto& e = sig_top[i];
+            char line[256];
+            std::snprintf(line, sizeof(line), "%d. %s (%s): %.1f%% net | %d bets | p=%.6f\n",
+                i+1, e.market.c_str(), e.approach.c_str(), e.net_roi*100, e.bets, e.pvalue);
+            msg += line;
+        }
         notify::send(msg, config_.notify_script);
     }
 }
@@ -111,19 +139,26 @@ void Lab::log_experiment(const StrategyConfig& config,
 }
 
 void Lab::print_leaderboard() const {
-    auto lb = knowledge_.get_leaderboard();
-    if (lb.empty()) { printf("No leaderboard entries yet.\n"); return; }
-    printf("\n=== KNOWLEDGE BASE LEADERBOARD ===\n");
-    printf("Experiments run: %d | Runtime: %.1f hours\n\n",
-           knowledge_.experiments_run(), knowledge_.total_runtime_hours());
-    printf("%-22s %8s %8s %6s %8s  %s\n",
-           "Market", "ROI%", "WR%", "Bets", "p-value", "Approach");
-    printf("%-22s %8s %8s %6s %8s  %s\n",
-           "------", "----", "---", "----", "-------", "--------");
-    for (const auto& [market, e] : lb) {
-        printf("%-22s %7.1f%% %7.1f%% %6d %8.4f  %s\n",
-               market.c_str(), e.roi * 100, e.wr * 100,
-               e.bets, e.pvalue, e.approach.c_str());
+    auto roi_top = knowledge_.top_by_roi(5);
+    auto sig_top = knowledge_.top_by_significance(5);
+    if (roi_top.empty()) { printf("No proven configs yet.\n"); return; }
+
+    printf("\nExperiments: %d | Proven: %zu\n",
+           knowledge_.experiments_run(), knowledge_.all_proven().size());
+
+    printf("\n=== HIGHEST ROI ===\n");
+    for (int i = 0; i < (int)roi_top.size(); i++) {
+        auto& e = roi_top[i];
+        printf("%d. %s (%s): %.1f%% net | %d bets | p=%.4f\n",
+               i+1, e.market.c_str(), e.approach.c_str(),
+               e.net_roi*100, e.bets, e.pvalue);
+    }
+    printf("\n=== MOST SIGNIFICANT ===\n");
+    for (int i = 0; i < (int)sig_top.size(); i++) {
+        auto& e = sig_top[i];
+        printf("%d. %s (%s): p=%.6f | %.1f%% net | %d bets\n",
+               i+1, e.market.c_str(), e.approach.c_str(),
+               e.pvalue, e.net_roi*100, e.bets);
     }
     printf("\n");
 }

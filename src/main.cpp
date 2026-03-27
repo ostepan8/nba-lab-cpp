@@ -170,27 +170,32 @@ int main(int argc, char* argv[]) {
     if (args.command == "leaderboard") {
         nba::KnowledgeBase kb;
         kb.load(config.knowledge_path);
-        auto lb = kb.get_leaderboard();
-        if (lb.empty()) {
-            printf("No leaderboard entries yet at: %s\n", config.knowledge_path.c_str());
+
+        printf("\nExperiments: %d | Runtime: %.1f hours | Proven configs: %zu\n",
+               kb.experiments_run(), kb.total_runtime_hours(), kb.all_proven().size());
+
+        auto roi_top = kb.top_by_roi(5);
+        auto sig_top = kb.top_by_significance(5);
+
+        if (roi_top.empty()) {
+            printf("No proven configs yet.\n");
             return 0;
         }
 
-        printf("\n=== KNOWLEDGE BASE LEADERBOARD ===\n");
-        printf("Path: %s\n", config.knowledge_path.c_str());
-        printf("Experiments run: %d | Runtime: %.1f hours\n\n",
-               kb.experiments_run(), kb.total_runtime_hours());
-        printf("%-22s %8s %8s %6s %8s  %s\n",
-               "Market", "ROI%", "WR%", "Bets", "p-value", "Approach");
-        printf("%-22s %8s %8s %6s %8s  %s\n",
-               "------", "----", "---", "----", "-------", "--------");
+        printf("\n=== HIGHEST ROI (p < 0.05, net > 0) ===\n");
+        for (int i = 0; i < (int)roi_top.size(); i++) {
+            auto& e = roi_top[i];
+            printf("%d. %s (%s): %.1f%% net | %d bets | p=%.4f | WR=%.1f%%\n",
+                   i+1, e.market.c_str(), e.approach.c_str(),
+                   e.net_roi*100, e.bets, e.pvalue, e.wr*100);
+        }
 
-        for (const auto& [market, entry] : lb) {
-            printf("%-22s %7.1f%% %7.1f%% %6d %8.4f  %s\n",
-                   market.c_str(),
-                   entry.roi * 100, entry.wr * 100,
-                   entry.bets, entry.pvalue,
-                   entry.approach.c_str());
+        printf("\n=== MOST SIGNIFICANT (net > 0, sorted by p-value) ===\n");
+        for (int i = 0; i < (int)sig_top.size(); i++) {
+            auto& e = sig_top[i];
+            printf("%d. %s (%s): p=%.6f | %.1f%% net | %d bets | WR=%.1f%%\n",
+                   i+1, e.market.c_str(), e.approach.c_str(),
+                   e.pvalue, e.net_roi*100, e.bets, e.wr*100);
         }
         printf("\n");
         return 0;
