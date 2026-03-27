@@ -2,6 +2,14 @@
 #include "../strategies/meanrev.h"
 #include "../strategies/situational.h"
 #include "../strategies/twostage.h"
+#include "../strategies/crossmarket.h"
+#include "../strategies/meta_ensemble.h"
+#include "../strategies/bayesian.h"
+#include "../strategies/ml_props.h"
+#include "../strategies/moneyline.h"
+#include "../strategies/compound.h"
+#include "../strategies/residual.h"
+#include "../strategies/ensemble.h"
 #include "../io/bet_history.h"
 #include "../io/notify.h"
 #include <nlohmann/json.hpp>
@@ -13,6 +21,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cmath>
+#include <map>
 
 namespace fs = std::filesystem;
 namespace nba {
@@ -26,9 +35,17 @@ Lab::Lab(const DataStore& store, const PlayerIndex& index,
 }
 
 std::unique_ptr<Strategy> Lab::create_strategy(const std::string& type) {
-    if (type == "meanrev")      return std::make_unique<MeanRevStrategy>();
-    if (type == "situational")  return std::make_unique<SituationalStrategy>();
-    if (type == "twostage")     return std::make_unique<TwostageStrategy>();
+    if (type == "meanrev")        return std::make_unique<MeanRevStrategy>();
+    if (type == "situational")    return std::make_unique<SituationalStrategy>();
+    if (type == "twostage")       return std::make_unique<TwostageStrategy>();
+    if (type == "crossmarket")    return std::make_unique<CrossMarketStrategy>();
+    if (type == "meta_ensemble")  return std::make_unique<MetaEnsembleStrategy>();
+    if (type == "bayesian")       return std::make_unique<BayesianStrategy>();
+    if (type == "ml_props")       return std::make_unique<MlPropsStrategy>();
+    if (type == "moneyline")      return std::make_unique<MoneylineStrategy>();
+    if (type == "compound")       return std::make_unique<CompoundStrategy>();
+    if (type == "residual")       return std::make_unique<ResidualStrategy>();
+    if (type == "ensemble")       return std::make_unique<EnsembleStrategy>();
     return std::make_unique<MeanRevStrategy>();
 }
 
@@ -125,13 +142,11 @@ void Lab::bench(int n) {
     for (int i = 0; i < n; i++)
         configs.push_back(hypothesis_gen_.generate("fast"));
 
-    int n_mr = 0, n_sit = 0, n_ts = 0;
-    for (const auto& c : configs) {
-        if (c.type == "meanrev") n_mr++;
-        else if (c.type == "situational") n_sit++;
-        else n_ts++;
-    }
-    printf("Mix: %d meanrev, %d situational, %d twostage\n", n_mr, n_sit, n_ts);
+    std::map<std::string, int> type_counts;
+    for (const auto& c : configs) type_counts[c.type]++;
+    printf("Mix:");
+    for (const auto& [t, cnt] : type_counts) printf(" %d %s", cnt, t.c_str());
+    printf("\n");
 
     auto t0 = std::chrono::high_resolution_clock::now();
     std::atomic<int> next{0}, done{0};
@@ -182,9 +197,14 @@ void Lab::run() {
     printf("\n=== NBA LAB v1.0 -- Parallel Experiment Runner ===\n");
     printf("Fast workers: %d | Slow workers: %d | Total: %d\n",
            config_.fast_workers, config_.slow_workers, nw);
-    printf("Weights: meanrev=%.0f%% situational=%.0f%% twostage=%.0f%%\n",
+    printf("Weights: mr=%.0f%% sit=%.0f%% ts=%.0f%% xm=%.0f%% meta=%.0f%% "
+           "bay=%.0f%% mlp=%.0f%% ml=%.0f%% cmp=%.0f%% res=%.0f%% ens=%.0f%%\n",
            config_.meanrev_weight * 100, config_.situational_weight * 100,
-           config_.twostage_weight * 100);
+           config_.twostage_weight * 100, config_.crossmarket_weight * 100,
+           config_.meta_weight * 100, config_.bayesian_weight * 100,
+           config_.ml_props_weight * 100, config_.moneyline_weight * 100,
+           config_.compound_weight * 100, config_.residual_weight * 100,
+           config_.ensemble_weight * 100);
     printf("Output:  %s\n", config_.output_dir.c_str());
     printf("Running experiments. Press Ctrl+C for graceful shutdown.\n\n");
 

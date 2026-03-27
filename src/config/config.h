@@ -16,10 +16,18 @@ struct LabConfig {
     int fast_workers = 6;
     int slow_workers = 2;
 
-    // Experiment generation weights (must sum to 1.0)
-    double meanrev_weight = 0.40;
-    double situational_weight = 0.30;
-    double twostage_weight = 0.30;
+    // Experiment generation weights
+    double meanrev_weight = 0.20;
+    double situational_weight = 0.15;
+    double twostage_weight = 0.10;
+    double crossmarket_weight = 0.15;
+    double meta_weight = 0.10;
+    double bayesian_weight = 0.10;
+    double ml_props_weight = 0.05;
+    double moneyline_weight = 0.05;
+    double compound_weight = 0.03;
+    double residual_weight = 0.03;
+    double ensemble_weight = 0.04;
 
     // Notification
     bool notify_enabled = true;

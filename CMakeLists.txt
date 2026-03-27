@@ -11,6 +11,19 @@ find_package(Threads REQUIRED)
 # nlohmann/json (header only)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+# Optional: LightGBM C API
+find_library(LGBM_LIB lightgbm)
+if(LGBM_LIB)
+    message(STATUS "LightGBM found: ${LGBM_LIB}")
+else()
+    message(STATUS "LightGBM not found -- using heuristic fallbacks for ML strategies")
+endif()
+
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 add_executable(nba_lab ${SOURCES})
 target_link_libraries(nba_lab Threads::Threads)
+
+if(LGBM_LIB)
+    target_link_libraries(nba_lab ${LGBM_LIB})
+    target_compile_definitions(nba_lab PRIVATE HAS_LIGHTGBM=1)
+endif()

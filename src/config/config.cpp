@@ -26,9 +26,17 @@ LabConfig LabConfig::defaults() {
     c.notify_script    = "~/claude-code-linux-harness/notify.sh";
     c.fast_workers     = 6;
     c.slow_workers     = 2;
-    c.meanrev_weight   = 0.40;
-    c.situational_weight = 0.30;
-    c.twostage_weight  = 0.30;
+    c.meanrev_weight     = 0.20;
+    c.situational_weight = 0.15;
+    c.twostage_weight    = 0.10;
+    c.crossmarket_weight = 0.15;
+    c.meta_weight        = 0.10;
+    c.bayesian_weight    = 0.10;
+    c.ml_props_weight    = 0.05;
+    c.moneyline_weight   = 0.05;
+    c.compound_weight    = 0.03;
+    c.residual_weight    = 0.03;
+    c.ensemble_weight    = 0.04;
     c.notify_enabled   = true;
     c.notify_min_roi   = 0.0;
     c.kalshi_fee_rate  = 0.038;
@@ -69,6 +77,14 @@ LabConfig LabConfig::load(const std::string& path) {
     if (j.contains("meanrev_weight"))     c.meanrev_weight     = j["meanrev_weight"].get<double>();
     if (j.contains("situational_weight")) c.situational_weight = j["situational_weight"].get<double>();
     if (j.contains("twostage_weight"))    c.twostage_weight    = j["twostage_weight"].get<double>();
+    if (j.contains("crossmarket_weight")) c.crossmarket_weight = j["crossmarket_weight"].get<double>();
+    if (j.contains("meta_weight"))        c.meta_weight        = j["meta_weight"].get<double>();
+    if (j.contains("bayesian_weight"))    c.bayesian_weight    = j["bayesian_weight"].get<double>();
+    if (j.contains("ml_props_weight"))    c.ml_props_weight    = j["ml_props_weight"].get<double>();
+    if (j.contains("moneyline_weight"))   c.moneyline_weight   = j["moneyline_weight"].get<double>();
+    if (j.contains("compound_weight"))    c.compound_weight    = j["compound_weight"].get<double>();
+    if (j.contains("residual_weight"))    c.residual_weight    = j["residual_weight"].get<double>();
+    if (j.contains("ensemble_weight"))    c.ensemble_weight    = j["ensemble_weight"].get<double>();
     if (j.contains("notify_enabled"))     c.notify_enabled     = j["notify_enabled"].get<bool>();
     if (j.contains("notify_min_roi"))     c.notify_min_roi     = j["notify_min_roi"].get<double>();
     if (j.contains("kalshi_fee_rate"))    c.kalshi_fee_rate    = j["kalshi_fee_rate"].get<double>();
@@ -77,12 +93,25 @@ LabConfig LabConfig::load(const std::string& path) {
     if (c.fast_workers < 1) c.fast_workers = 1;
     if (c.slow_workers < 0) c.slow_workers = 0;
 
-    // Normalize weights
-    double total = c.meanrev_weight + c.situational_weight + c.twostage_weight;
+    // Normalize weights: ensure they sum to something positive
+    double total = c.meanrev_weight + c.situational_weight + c.twostage_weight
+                 + c.crossmarket_weight + c.meta_weight + c.bayesian_weight
+                 + c.ml_props_weight + c.moneyline_weight + c.compound_weight
+                 + c.residual_weight + c.ensemble_weight;
     if (total < 1e-9) {
-        c.meanrev_weight = 0.40;
-        c.situational_weight = 0.30;
-        c.twostage_weight = 0.30;
+        // Reset to defaults
+        auto def = defaults();
+        c.meanrev_weight     = def.meanrev_weight;
+        c.situational_weight = def.situational_weight;
+        c.twostage_weight    = def.twostage_weight;
+        c.crossmarket_weight = def.crossmarket_weight;
+        c.meta_weight        = def.meta_weight;
+        c.bayesian_weight    = def.bayesian_weight;
+        c.ml_props_weight    = def.ml_props_weight;
+        c.moneyline_weight   = def.moneyline_weight;
+        c.compound_weight    = def.compound_weight;
+        c.residual_weight    = def.residual_weight;
+        c.ensemble_weight    = def.ensemble_weight;
     }
 
     printf("Config loaded from: %s\n", path.c_str());
@@ -106,6 +135,14 @@ void LabConfig::save(const std::string& path) const {
     j["meanrev_weight"]     = meanrev_weight;
     j["situational_weight"] = situational_weight;
     j["twostage_weight"]    = twostage_weight;
+    j["crossmarket_weight"] = crossmarket_weight;
+    j["meta_weight"]        = meta_weight;
+    j["bayesian_weight"]    = bayesian_weight;
+    j["ml_props_weight"]    = ml_props_weight;
+    j["moneyline_weight"]   = moneyline_weight;
+    j["compound_weight"]    = compound_weight;
+    j["residual_weight"]    = residual_weight;
+    j["ensemble_weight"]    = ensemble_weight;
     j["notify_enabled"]     = notify_enabled;
     j["notify_min_roi"]     = notify_min_roi;
     j["kalshi_fee_rate"]    = kalshi_fee_rate;

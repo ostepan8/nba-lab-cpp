@@ -28,6 +28,14 @@ private:
     StrategyConfig generate_meanrev();
     StrategyConfig generate_situational();
     StrategyConfig generate_twostage();
+    StrategyConfig generate_crossmarket();
+    StrategyConfig generate_meta_ensemble();
+    StrategyConfig generate_bayesian();
+    StrategyConfig generate_ml_props();
+    StrategyConfig generate_moneyline();
+    StrategyConfig generate_compound();
+    StrategyConfig generate_residual();
+    StrategyConfig generate_ensemble();
 };
 
 } // namespace nba

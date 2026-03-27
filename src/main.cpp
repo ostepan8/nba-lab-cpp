@@ -209,9 +209,14 @@ int main(int argc, char* argv[]) {
         printf("  Notify script:  %s\n", config.notify_script.c_str());
         printf("  Fast workers:   %d\n", config.fast_workers);
         printf("  Slow workers:   %d\n", config.slow_workers);
-        printf("  Weights:        meanrev=%.0f%% sit=%.0f%% twostage=%.0f%%\n",
+        printf("  Weights:        mr=%.0f%% sit=%.0f%% ts=%.0f%% xm=%.0f%% meta=%.0f%% "
+               "bay=%.0f%% mlp=%.0f%% ml=%.0f%% cmp=%.0f%% res=%.0f%% ens=%.0f%%\n",
                config.meanrev_weight * 100, config.situational_weight * 100,
-               config.twostage_weight * 100);
+               config.twostage_weight * 100, config.crossmarket_weight * 100,
+               config.meta_weight * 100, config.bayesian_weight * 100,
+               config.ml_props_weight * 100, config.moneyline_weight * 100,
+               config.compound_weight * 100, config.residual_weight * 100,
+               config.ensemble_weight * 100);
         printf("  Notify:         %s (min ROI: %.1f%%)\n",
                config.notify_enabled ? "on" : "off", config.notify_min_roi * 100);
         printf("  Kalshi fee:     %.1f%%\n", config.kalshi_fee_rate * 100);

@@ -12,7 +12,9 @@ namespace nba {
 
 struct StrategyConfig {
     std::string name;
-    std::string type;           // "meanrev", "situational", "twostage"
+    std::string type;           // "meanrev", "situational", "twostage", "crossmarket",
+                                 // "meta_ensemble", "bayesian", "ml_props", "moneyline",
+                                 // "compound", "residual", "ensemble"
     std::string target_stat;    // "PTS", "REB", "AST", "FG3M", "STL", "BLK"
     std::string target_market;  // "player_points", "player_rebounds", etc.
     std::vector<std::string> sides;  // {"OVER","UNDER"} or {"UNDER"}
