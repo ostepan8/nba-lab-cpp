@@ -1,5 +1,6 @@
 #include "walkforward.h"
 #include <unordered_map>
+#include <unordered_set>
 #include <chrono>
 
 namespace nba {
@@ -61,6 +62,40 @@ ExperimentResult WalkforwardRunner::run(const StrategyConfig& config,
             pl.over_odds = median(agg.over_odds);
             pl.under_odds = median(agg.under_odds);
             player_props_vec.push_back({name, pl});
+        }
+
+        // Aggregate by player_id — merge name variants into one entry per player
+        // "Cam Thomas" and "Cameron Thomas" with the same ID get merged,
+        // their lines/odds combined into one median. Matches Python behavior
+        // where groupby("player_name") + player_id lookup effectively deduplicates.
+        {
+            std::unordered_map<int, size_t> id_to_idx;  // player_id → index in deduped
+            std::vector<std::pair<std::string, AggProp>> merged;
+            for (auto& [name, agg] : player_agg) {
+                if (agg.player_id != 0 && id_to_idx.count(agg.player_id)) {
+                    // Merge into existing entry
+                    auto& existing = merged[id_to_idx[agg.player_id]].second;
+                    existing.lines.insert(existing.lines.end(), agg.lines.begin(), agg.lines.end());
+                    existing.over_odds.insert(existing.over_odds.end(), agg.over_odds.begin(), agg.over_odds.end());
+                    existing.under_odds.insert(existing.under_odds.end(), agg.under_odds.begin(), agg.under_odds.end());
+                } else {
+                    if (agg.player_id != 0) id_to_idx[agg.player_id] = merged.size();
+                    merged.push_back({name, agg});
+                }
+            }
+            // Rebuild player_props_vec from merged
+            player_props_vec.clear();
+            for (auto& [name, agg] : merged) {
+                PropLine pl;
+                pl.player_name = name;
+                pl.player_id = agg.player_id;
+                pl.market_type = config.target_market;
+                pl.date = date;
+                pl.line = median(agg.lines);
+                pl.over_odds = median(agg.over_odds);
+                pl.under_odds = median(agg.under_odds);
+                player_props_vec.push_back({name, pl});
+            }
         }
 
         for (const auto& [pname, prop_val] : player_props_vec) {

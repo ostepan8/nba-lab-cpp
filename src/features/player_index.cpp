@@ -1,6 +1,7 @@
 #include "player_index.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 
 namespace nba {
 
@@ -101,6 +102,7 @@ void PlayerIndex::build(const DataStore& store) {
     for (const auto& [name, pid] : discovered) {
         // Always register the name → pid mapping (handles aliases)
         name_to_id_[name] = pid;
+        normalized_to_id_[normalize_name(name)] = pid;
 
         // Only build PlayerStats once per pid
         if (by_id_.count(pid)) continue;
@@ -153,9 +155,32 @@ const PlayerStats* PlayerIndex::get_by_id(int pid) const {
 }
 
 const PlayerStats* PlayerIndex::get_by_name(const std::string& name) const {
+    // Try exact match first
     auto it = name_to_id_.find(name);
-    if (it == name_to_id_.end()) return nullptr;
-    return get_by_id(it->second);
+    if (it != name_to_id_.end()) return get_by_id(it->second);
+    // Try normalized name
+    auto it2 = normalized_to_id_.find(normalize_name(name));
+    if (it2 != normalized_to_id_.end()) return get_by_id(it2->second);
+    return nullptr;
+}
+
+std::string PlayerIndex::normalize_name(const std::string& name) {
+    std::string n = name;
+    // Remove dots
+    n.erase(std::remove(n.begin(), n.end(), '.'), n.end());
+    // Remove common suffixes
+    for (const char* suffix : {" Jr", " Jr.", " Sr", " II", " III", " IV", " V"}) {
+        size_t pos = n.rfind(suffix);
+        if (pos != std::string::npos && pos + strlen(suffix) == n.size()) {
+            n = n.substr(0, pos);
+        }
+    }
+    // Lowercase
+    std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+    // Trim whitespace
+    while (!n.empty() && n.back() == ' ') n.pop_back();
+    while (!n.empty() && n.front() == ' ') n.erase(n.begin());
+    return n;
 }
 
 } // namespace nba

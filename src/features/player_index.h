@@ -39,6 +39,7 @@ public:
     const PlayerStats* get_by_name(const std::string& name) const;
 
     size_t size() const { return by_id_.size(); }
+    static std::string normalize_name(const std::string& name);
 
     // Iterate all players
     const std::unordered_map<int, PlayerStats>& all() const { return by_id_; }
@@ -46,6 +47,7 @@ public:
 private:
     std::unordered_map<int, PlayerStats> by_id_;
     std::unordered_map<std::string, int> name_to_id_;
+    std::unordered_map<std::string, int> normalized_to_id_;  // normalized name → pid
 };
 
 } // namespace nba

@@ -21,7 +21,7 @@
   "neural_weight": 0.05,
   "spreads_weight": 0.03,
   "totals_weight": 0.02,
-  "notify_enabled": true,
+  "notify_enabled": false,
   "notify_min_roi": 0.0,
   "kalshi_fee_rate": 0.038
 }
