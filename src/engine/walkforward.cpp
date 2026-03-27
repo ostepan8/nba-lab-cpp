@@ -22,21 +22,49 @@ ExperimentResult WalkforwardRunner::run(const StrategyConfig& config,
         const auto& day_props = store_.get_props(date);
         if (day_props.empty()) continue;
 
-        // Group props by player name for this market type.
-        // We only need the first prop per player (they should be unique per
-        // market type per player per date, but dedup just in case).
-        std::unordered_map<std::string, const PropLine*> player_props;
-        player_props.reserve(day_props.size());
+        // Group props by player name, compute MEDIAN line and odds across bookmakers
+        // (matches Python: groupby("player_name").agg({"line": "median", ...}))
+        struct AggProp {
+            std::string player_name;
+            int player_id = 0;
+            std::vector<double> lines, over_odds, under_odds;
+            PropLine median_prop;  // Will hold the aggregated values
+        };
+        std::unordered_map<std::string, AggProp> player_agg;
 
         for (const auto& p : day_props) {
             if (p.market_type != config.target_market) continue;
-            // Keep only the first occurrence per player
-            if (player_props.find(p.player_name) == player_props.end()) {
-                player_props[p.player_name] = &p;
-            }
+            auto& agg = player_agg[p.player_name];
+            agg.player_name = p.player_name;
+            if (p.player_id != 0) agg.player_id = p.player_id;
+            agg.lines.push_back(p.line);
+            agg.over_odds.push_back(p.over_odds);
+            agg.under_odds.push_back(p.under_odds);
         }
 
-        for (const auto& [pname, prop] : player_props) {
+        // Compute medians
+        auto median = [](std::vector<double>& v) -> double {
+            if (v.empty()) return 0.0;
+            std::sort(v.begin(), v.end());
+            size_t n = v.size();
+            return (n % 2 == 0) ? (v[n/2 - 1] + v[n/2]) / 2.0 : v[n/2];
+        };
+
+        std::vector<std::pair<std::string, PropLine>> player_props_vec;
+        for (auto& [name, agg] : player_agg) {
+            PropLine pl;
+            pl.player_name = name;
+            pl.player_id = agg.player_id;
+            pl.market_type = config.target_market;
+            pl.date = date;
+            pl.line = median(agg.lines);
+            pl.over_odds = median(agg.over_odds);
+            pl.under_odds = median(agg.under_odds);
+            player_props_vec.push_back({name, pl});
+        }
+
+        for (const auto& [pname, prop_val] : player_props_vec) {
+            const PropLine* prop = &prop_val;
             // Look up player in index
             const PlayerStats* ps = nullptr;
             if (prop->player_id != 0) {
