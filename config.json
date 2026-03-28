@@ -2,7 +2,7 @@
     "data_dir": "/home/ostepan8/Desktop/nba-modeling/data/raw",
     "kalshi_dir": "/home/ostepan8/Desktop/nba-modeling/data/raw/kalshi",
     "output_dir": "/home/ostepan8/Desktop/nba-modeling/results",
-    "knowledge_path": "/home/ostepan8/Desktop/nba-modeling/results/lab/knowledge_cpp.json",
+    "knowledge_path": "",
     "notify_script": "/home/ostepan8/claude-code-linux-harness/notify.sh",
     "fast_workers": 16,
     "slow_workers": 2,
