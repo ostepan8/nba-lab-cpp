@@ -4,6 +4,7 @@
 #include "../config/config.h"
 #include "../data/store.h"
 #include "../data/prop_cache.h"
+#include "../data/game_cache.h"
 #include "../features/player_index.h"
 #include "../features/odds.h"
 #include "../io/knowledge.h"
@@ -21,7 +22,7 @@ class Lab {
 public:
     Lab(const DataStore& store, const PlayerIndex& index,
         const KalshiCache& kalshi, const LabConfig& config,
-        const PropCache& prop_cache);
+        const PropCache& prop_cache, const GameCache& game_cache);
 
     // Run forever -- generates and runs experiments in parallel.
     // Respects the running_ flag for graceful shutdown.
@@ -47,6 +48,7 @@ private:
     const PlayerIndex& index_;
     const KalshiCache& kalshi_;
     const PropCache& prop_cache_;
+    const GameCache& game_cache_;
     LabConfig config_;
 
     std::unique_ptr<Strategy> create_strategy(const std::string& type);

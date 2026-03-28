@@ -188,6 +188,8 @@ std::map<std::string, std::vector<OddsLine>> parse_odds(const std::string& dir_p
             o.date             = cols[0];
             o.home_team        = cols[3];
             o.away_team        = cols[4];
+            o.home_abbr        = cols[7];
+            o.away_abbr        = cols[8];
             o.market_type      = cols[10];
             o.home_odds        = safe_double(cols[11]);
             o.away_odds        = safe_double(cols[12]);

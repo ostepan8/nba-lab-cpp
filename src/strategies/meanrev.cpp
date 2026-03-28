@@ -21,7 +21,9 @@ ExperimentResult MeanRevStrategy::run(const StrategyConfig& config,
                                        const DataStore& store,
                                        const PlayerIndex& index,
                                        const KalshiCache& kalshi,
-                                  const PropCache* prop_cache) {
+                                  const PropCache* prop_cache,
+                                  const GameCache* game_cache) {
+    (void)game_cache;
     WalkforwardRunner runner(store, index, kalshi, prop_cache);
 
     // Determine which stat array to use

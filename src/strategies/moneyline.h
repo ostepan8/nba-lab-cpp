@@ -10,7 +10,8 @@ public:
                           const DataStore& store,
                           const PlayerIndex& index,
                           const KalshiCache& kalshi,
-                                  const PropCache* prop_cache = nullptr) override;
+                                  const PropCache* prop_cache = nullptr,
+                                  const GameCache* game_cache = nullptr) override;
 };
 
 } // namespace nba

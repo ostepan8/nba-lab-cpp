@@ -32,8 +32,8 @@ namespace nba {
 
 Lab::Lab(const DataStore& store, const PlayerIndex& index,
          const KalshiCache& kalshi, const LabConfig& config,
-         const PropCache& prop_cache)
-    : store_(store), index_(index), kalshi_(kalshi), prop_cache_(prop_cache),
+         const PropCache& prop_cache, const GameCache& game_cache)
+    : store_(store), index_(index), kalshi_(kalshi), prop_cache_(prop_cache), game_cache_(game_cache),
       config_(config), hypothesis_gen_(config) {
     if (!config_.knowledge_path.empty())
         knowledge_.load(config_.knowledge_path);
@@ -179,7 +179,7 @@ void Lab::print_leaderboard() const {
 
 void Lab::run_single(const StrategyConfig& config) {
     auto strategy = create_strategy(config.type);
-    auto result = strategy->run(config, store_, index_, kalshi_, &prop_cache_);
+    auto result = strategy->run(config, store_, index_, kalshi_, &prop_cache_, &game_cache_);
     printf("[%s] bets=%d WR=%.1f%% ROI=%.1f%% PnL=$%.0f p=%.4f (%.3fs)\n",
            config.name.c_str(), result.total_bets, result.win_rate * 100,
            result.roi * 100, result.pnl, result.pvalue, result.elapsed_seconds);
@@ -217,7 +217,7 @@ void Lab::bench(int n) {
                 int idx = next.fetch_add(1);
                 if (idx >= n) break;
                 auto s = create_strategy(configs[idx].type);
-                auto r = s->run(configs[idx], store_, index_, kalshi_, &prop_cache_);
+                auto r = s->run(configs[idx], store_, index_, kalshi_, &prop_cache_, &game_cache_);
                 evaluate_result(configs[idx], r);
                 // log_experiment(configs[idx], r);
                 double prev = cpu_time.load();
@@ -324,7 +324,7 @@ void Lab::run() {
                 wq.q.pop();
             }
             auto s = create_strategy(cfg.type);
-            auto r = s->run(cfg, store_, index_, kalshi_, &prop_cache_);
+            auto r = s->run(cfg, store_, index_, kalshi_, &prop_cache_, &game_cache_);
             int exp = experiments_run_.fetch_add(1) + 1;
             // restored per-experiment output
             (void)exp; (void)label;

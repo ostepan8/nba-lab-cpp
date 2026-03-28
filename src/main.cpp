@@ -1,6 +1,7 @@
 #include "config/config.h"
 #include "data/store.h"
 #include "data/prop_cache.h"
+#include "data/game_cache.h"
 #include "features/player_index.h"
 #include "features/z_score.h"
 #include "features/odds.h"
@@ -120,6 +121,7 @@ struct DataBundle {
     nba::PlayerIndex player_index;
     nba::KalshiCache kalshi;
     nba::PropCache prop_cache;
+    nba::GameCache game_cache;
 };
 
 static DataBundle load_data(const nba::LabConfig& config) {
@@ -155,7 +157,13 @@ static DataBundle load_data(const nba::LabConfig& config) {
     printf("  PropCache built (%ldms)\n",
            duration_cast<milliseconds>(t7 - t6).count());
 
-    auto total_ms = duration_cast<milliseconds>(t7 - t0).count();
+    auto t8 = high_resolution_clock::now();
+    db.game_cache.build(config.data_dir);
+    auto t9 = high_resolution_clock::now();
+    printf("  GameCache built (%ldms)\n",
+           duration_cast<milliseconds>(t9 - t8).count());
+
+    auto total_ms = duration_cast<milliseconds>(t9 - t0).count();
     printf("  Total load time: %ldms\n\n", total_ms);
 
     return db;
@@ -267,11 +275,11 @@ int main(int argc, char* argv[]) {
         auto j = nlohmann::json::parse(args.single_json);
         auto strat_config = nba::StrategyConfig::from_json(j);
 
-        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache);
+        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache, db.game_cache);
         lab.run_single(strat_config);
 
     } else if (args.command == "bench") {
-        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache);
+        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache, db.game_cache);
 
         // Install signal handler for graceful interrupt
         g_lab = &lab;
@@ -282,7 +290,7 @@ int main(int argc, char* argv[]) {
 
     } else if (args.command == "run") {
         if (args.duration > 0) config.max_runtime_seconds = args.duration;
-        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache);
+        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache, db.game_cache);
 
         // Install signal handler for graceful shutdown
         g_lab = &lab;

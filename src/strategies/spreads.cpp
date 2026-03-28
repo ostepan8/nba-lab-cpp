@@ -58,7 +58,8 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
                                         const DataStore& store,
                                         const PlayerIndex& index,
                                         const KalshiCache& kalshi,
-                                  const PropCache* prop_cache) {
+                                  const PropCache* prop_cache,
+                                  const GameCache* game_cache) {
     (void)index;
     (void)kalshi;
 
@@ -82,8 +83,8 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
         for (const auto& ol : odds_lines) {
             if (ol.market_type != "spreads") continue;
 
-            const auto& home = ol.home_team;
-            const auto& away = ol.away_team;
+            const auto& home = ol.home_abbr.empty() ? ol.home_team : ol.home_abbr;
+            const auto& away = ol.away_abbr.empty() ? ol.away_team : ol.away_abbr;
             if (home.empty() || away.empty()) continue;
 
             if (elo_map.find(home) == elo_map.end()) elo_map[home] = SpreadTeamElo{};
@@ -164,6 +165,14 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
 
             double bet_size = kelly_frac * config.kelly * 1000.0;
 
+            // Resolve bet using actual game result
+            const GameResult* gr = game_cache ? game_cache->get(date, home, away) : nullptr;
+            if (!gr) {
+                he.games++;
+                ae.games++;
+                continue;  // Can't resolve without actual result
+            }
+
             Bet bet;
             bet.date = date;
             bet.player = home + " vs " + away;
@@ -172,13 +181,29 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
             bet.side = side;
             bet.odds = dec_odds_val;
             bet.bet_size = bet_size;
+            bet.actual = static_cast<double>(gr->margin);
+
+            // Did the bet cover the spread?
+            // market_spread is home's spread (negative = home favored)
+            // Home covers if actual_margin > -market_spread
+            bool home_covered = gr->margin > (-market_spread);
+            bet.won = (side == "HOME") ? home_covered : !home_covered;
+
+            if (bet.won) {
+                bet.pnl = bet_size * (dec_odds_val - 1.0);
+                result.wins++;
+            } else {
+                bet.pnl = -bet_size;
+            }
+
+            result.bankroll += bet.pnl;
+            result.pnl += bet.pnl;
             result.bets.push_back(bet);
             result.total_bets++;
 
-            // Update ELO ratings
+            // Update ELO ratings using actual result
             double expected_home = elo_expected(he.elo + 50.0, ae.elo);
-            // Use the implied outcome from odds as a proxy
-            double actual_home = (ol.home_odds < ol.away_odds) ? 0.6 : 0.4;
+            double actual_home = gr->won ? 1.0 : 0.0;
             he.elo += K * (actual_home - expected_home);
             ae.elo += K * ((1.0 - actual_home) - (1.0 - expected_home));
             he.games++;
@@ -189,16 +214,18 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
     auto t1 = std::chrono::high_resolution_clock::now();
     result.elapsed_seconds = std::chrono::duration<double>(t1 - t0).count();
 
+    // Summary stats (wins/pnl already accumulated inline)
     if (result.total_bets > 0) {
-        for (const auto& b : result.bets) {
-            if (b.won) result.wins++;
-            result.pnl += b.pnl;
-        }
         result.win_rate = static_cast<double>(result.wins) / result.total_bets;
         double total_wagered = 0.0;
         for (const auto& b : result.bets) total_wagered += b.bet_size;
         result.roi = (total_wagered > 0) ? result.pnl / total_wagered : 0.0;
-        result.bankroll += result.pnl;
+
+        // P-value
+        double n = result.total_bets;
+        double se = std::sqrt(0.25 / n);
+        double z = (result.win_rate - 0.5) / se;
+        result.pvalue = 0.5 * std::erfc(z / std::sqrt(2.0));
     }
 
     return result;

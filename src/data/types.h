@@ -44,7 +44,9 @@ struct OddsLine {
     std::string date;
     std::string home_team;
     std::string away_team;
-    double home_odds = 0.0;  // American
+    std::string home_abbr;    // e.g. "WAS"
+    std::string away_abbr;    // e.g. "PHI"
+    double home_odds = 0.0;   // American
     double away_odds = 0.0;
     std::string market_type;  // "h2h", "spreads", "totals"
     double home_point = 0.0;

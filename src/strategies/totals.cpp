@@ -80,7 +80,8 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
                                        const DataStore& store,
                                        const PlayerIndex& index,
                                        const KalshiCache& kalshi,
-                                  const PropCache* prop_cache) {
+                                  const PropCache* prop_cache,
+                                  const GameCache* game_cache) {
     (void)index;
     (void)kalshi;
 
@@ -104,8 +105,8 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
         for (const auto& ol : odds_lines) {
             if (ol.market_type != "totals") continue;
 
-            const auto& home = ol.home_team;
-            const auto& away = ol.away_team;
+            const auto& home = ol.home_abbr.empty() ? ol.home_team : ol.home_abbr;
+            const auto& away = ol.away_abbr.empty() ? ol.away_team : ol.away_abbr;
             if (home.empty() || away.empty()) continue;
 
             auto& hs = team_stats[home];
@@ -193,6 +194,16 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
 
             double bet_size = kelly_frac * config.kelly * 1000.0;
 
+            // Resolve bet using actual game result
+            const GameResult* gr = game_cache ? game_cache->get(date, home, away) : nullptr;
+            if (!gr) {
+                hs.games++;
+                as.games++;
+                continue;
+            }
+
+            double actual_total = static_cast<double>(gr->pts + gr->opp_pts);
+
             Bet bet;
             bet.date = date;
             bet.player = home + " vs " + away;
@@ -201,22 +212,29 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
             bet.side = side;
             bet.odds = dec_odds_val;
             bet.bet_size = bet_size;
+            bet.actual = actual_total;
+            bet.won = (side == "OVER") ? (actual_total > market_total) : (actual_total < market_total);
+
+            if (bet.won) {
+                bet.pnl = bet_size * (dec_odds_val - 1.0);
+                result.wins++;
+            } else {
+                bet.pnl = -bet_size;
+            }
+
+            result.bankroll += bet.pnl;
+            result.pnl += bet.pnl;
             result.bets.push_back(bet);
             result.total_bets++;
 
-            // Update team stats (use proxy data from odds patterns)
-            // In real usage, game results would feed back here.
-            // For now, use the market total as a rough proxy for actual scoring.
-            double proxy_home_pts = market_total / 2.0 + 2.0;  // slight home advantage
-            double proxy_away_pts = market_total / 2.0 - 2.0;
+            // Update team stats with ACTUAL results
+            hs.points_scored.push_back(gr->pts);
+            hs.points_allowed.push_back(gr->opp_pts);
+            hs.possessions.push_back(estimate_possessions(gr->pts));
 
-            hs.points_scored.push_back(proxy_home_pts);
-            hs.points_allowed.push_back(proxy_away_pts);
-            hs.possessions.push_back(estimate_possessions(proxy_home_pts));
-
-            as.points_scored.push_back(proxy_away_pts);
-            as.points_allowed.push_back(proxy_home_pts);
-            as.possessions.push_back(estimate_possessions(proxy_away_pts));
+            as.points_scored.push_back(gr->opp_pts);
+            as.points_allowed.push_back(gr->pts);
+            as.possessions.push_back(estimate_possessions(gr->opp_pts));
 
             hs.games++;
             as.games++;
@@ -227,15 +245,15 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
     result.elapsed_seconds = std::chrono::duration<double>(t1 - t0).count();
 
     if (result.total_bets > 0) {
-        for (const auto& b : result.bets) {
-            if (b.won) result.wins++;
-            result.pnl += b.pnl;
-        }
         result.win_rate = static_cast<double>(result.wins) / result.total_bets;
         double total_wagered = 0.0;
         for (const auto& b : result.bets) total_wagered += b.bet_size;
         result.roi = (total_wagered > 0) ? result.pnl / total_wagered : 0.0;
-        result.bankroll += result.pnl;
+
+        double n = result.total_bets;
+        double se = std::sqrt(0.25 / n);
+        double z = (result.win_rate - 0.5) / se;
+        result.pvalue = 0.5 * std::erfc(z / std::sqrt(2.0));
     }
 
     return result;

@@ -5,6 +5,7 @@
 #include "../features/player_index.h"
 #include "../features/odds.h"
 #include "../data/prop_cache.h"
+#include "../data/game_cache.h"
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -189,7 +190,8 @@ public:
                                   const DataStore& store,
                                   const PlayerIndex& index,
                                   const KalshiCache& kalshi,
-                                  const PropCache* prop_cache = nullptr) = 0;
+                                  const PropCache* prop_cache = nullptr,
+                                  const GameCache* game_cache = nullptr) = 0;
 };
 
 } // namespace nba
