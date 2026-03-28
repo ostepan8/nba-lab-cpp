@@ -4,6 +4,7 @@
 #include <cmath>
 #include <chrono>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace nba {
@@ -75,8 +76,10 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
     const double nba_std = 12.0;  // NBA game margin std dev ~12 points
 
     std::unordered_map<std::string, SpreadTeamElo> elo_map;
+    std::unordered_set<std::string> bet_games;  // dedup: one bet per game per date
 
     for (const auto& date : dates) {
+        bet_games.clear();
         const auto& odds_lines = store.get_odds(date);
         if (odds_lines.empty()) continue;
 
@@ -165,6 +168,14 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
 
             double bet_size = kelly_frac * config.kelly * 1000.0;
 
+            // Dedup: only bet once per game
+            std::string game_key = date + "|" + home + "|" + away;
+            if (bet_games.count(game_key)) {
+                he.games++;
+                ae.games++;
+                continue;
+            }
+
             // Resolve bet using actual game result
             const GameResult* gr = game_cache ? game_cache->get(date, home, away) : nullptr;
             if (!gr) {
@@ -200,6 +211,7 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
             result.pnl += bet.pnl;
             result.bets.push_back(bet);
             result.total_bets++;
+            bet_games.insert(game_key);
 
             // Update ELO ratings using actual result
             double expected_home = elo_expected(he.elo + 50.0, ae.elo);

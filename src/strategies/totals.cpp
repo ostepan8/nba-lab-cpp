@@ -4,6 +4,7 @@
 #include <cmath>
 #include <chrono>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace nba {
@@ -97,8 +98,10 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
     const double nba_total_std = 15.0;  // NBA total points std dev ~15
 
     std::unordered_map<std::string, TeamTotalsStats> team_stats;
+    std::unordered_set<std::string> bet_games;
 
     for (const auto& date : dates) {
+        bet_games.clear();
         const auto& odds_lines = store.get_odds(date);
         if (odds_lines.empty()) continue;
 
@@ -194,6 +197,14 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
 
             double bet_size = kelly_frac * config.kelly * 1000.0;
 
+            // Dedup: one bet per game
+            std::string game_key = date + "|" + home + "|" + away;
+            if (bet_games.count(game_key)) {
+                hs.games++;
+                as.games++;
+                continue;
+            }
+
             // Resolve bet using actual game result
             const GameResult* gr = game_cache ? game_cache->get(date, home, away) : nullptr;
             if (!gr) {
@@ -226,6 +237,7 @@ ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
             result.pnl += bet.pnl;
             result.bets.push_back(bet);
             result.total_bets++;
+            bet_games.insert(game_key);
 
             // Update team stats with ACTUAL results
             hs.points_scored.push_back(gr->pts);

@@ -29,26 +29,43 @@ void GameCache::load_file(const std::string& path) {
     std::ifstream f(path);
     if (!f.is_open()) return;
 
-    std::string line;
-    std::getline(f, line); // skip header
+    std::string header_line;
+    std::getline(f, header_line);
 
-    // games CSVs have two rows per game (one per team)
-    // We need to pair them by GAME_ID to get both scores.
-    // Format: SEASON_ID,TEAM_ID,TEAM_ABBREVIATION,TEAM_NAME,GAME_ID,GAME_DATE,
-    //         MATCHUP,WL,MIN,PTS,...,PLUS_MINUS
+    // Parse header to find column indices dynamically
+    std::vector<std::string> headers;
+    {
+        std::stringstream hss(header_line);
+        std::string h;
+        while (std::getline(hss, h, ',')) headers.push_back(h);
+    }
+
+    int col_abbr = -1, col_game_id = -1, col_date = -1, col_matchup = -1;
+    int col_wl = -1, col_pts = -1, col_pm = -1;
+    for (int i = 0; i < (int)headers.size(); i++) {
+        if (headers[i] == "TEAM_ABBREVIATION") col_abbr = i;
+        else if (headers[i] == "GAME_ID") col_game_id = i;
+        else if (headers[i] == "GAME_DATE") col_date = i;
+        else if (headers[i] == "MATCHUP") col_matchup = i;
+        else if (headers[i] == "WL") col_wl = i;
+        else if (headers[i] == "PTS") col_pts = i;
+        else if (headers[i] == "PLUS_MINUS") col_pm = i;
+    }
+
+    if (col_pts < 0 || col_game_id < 0) return;  // can't parse this file
 
     struct RawGame {
         std::string game_id;
         std::string date;
         std::string team_abbr;
-        std::string matchup; // "BOS vs. DAL" (home) or "DAL @ BOS" (away)
+        std::string matchup;
         bool won = false;
         int pts = 0;
         double plus_minus = 0.0;
     };
 
-    // Collect all rows, then pair by game_id
     std::unordered_map<std::string, std::vector<RawGame>> by_game;
+    std::string line;
 
     while (std::getline(f, line)) {
         if (line.empty()) continue;
@@ -60,16 +77,19 @@ void GameCache::load_file(const std::string& path) {
             cols.push_back(col);
         }
 
-        if (cols.size() < 28) continue;
+        if ((int)cols.size() <= std::max({col_abbr, col_game_id, col_date, col_matchup, col_wl, col_pts}))
+            continue;
 
         RawGame rg;
-        rg.team_abbr = cols[2];     // TEAM_ABBREVIATION
-        rg.game_id = cols[4];       // GAME_ID
-        rg.date = cols[5];          // GAME_DATE
-        rg.matchup = cols[6];       // MATCHUP
-        rg.won = (cols[7] == "W");  // WL
-        try { rg.pts = std::stoi(cols[9]); } catch (...) {}           // PTS
-        try { rg.plus_minus = std::stod(cols[27]); } catch (...) {}   // PLUS_MINUS
+        rg.team_abbr = cols[col_abbr];
+        rg.game_id = cols[col_game_id];
+        rg.date = cols[col_date];
+        rg.matchup = cols[col_matchup];
+        rg.won = (cols[col_wl] == "W");
+        try { rg.pts = std::stoi(cols[col_pts]); } catch (...) {}
+        if (col_pm >= 0 && col_pm < (int)cols.size()) {
+            try { rg.plus_minus = std::stod(cols[col_pm]); } catch (...) {}
+        }
 
         by_game[rg.game_id].push_back(rg);
     }

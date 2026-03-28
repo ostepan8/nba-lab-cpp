@@ -4,6 +4,7 @@
 #include <cmath>
 #include <chrono>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace nba {
@@ -39,8 +40,10 @@ ExperimentResult MoneylineStrategy::run(const StrategyConfig& config,
     const double home_advantage = 50.0;
 
     std::unordered_map<std::string, TeamElo> elo_map;
+    std::unordered_set<std::string> bet_games;
 
     for (const auto& date : dates) {
+        bet_games.clear();
         const auto& odds_lines = store.get_odds(date);
         if (odds_lines.empty()) continue;
 
@@ -99,6 +102,8 @@ ExperimentResult MoneylineStrategy::run(const StrategyConfig& config,
                         }
 
                         if (!side.empty() && dec_odds_val <= config.max_odds) {
+                            std::string game_key = date + "|" + home + "|" + away;
+                            if (bet_games.count(game_key)) continue;
                             double b = dec_odds_val - 1.0;
                             double kelly_frac = (model_prob * b - (1.0 - model_prob)) / b;
                             kelly_frac = std::max(0.0, std::min(kelly_frac, 0.05));
@@ -128,6 +133,7 @@ ExperimentResult MoneylineStrategy::run(const StrategyConfig& config,
                                 result.pnl += bet.pnl;
                                 result.bets.push_back(bet);
                                 result.total_bets++;
+                                bet_games.insert(game_key);
                             }
                         }
                     }
