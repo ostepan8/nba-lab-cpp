@@ -76,10 +76,13 @@ bool ModelsDB::upsert_model(const ProvenConfig& pc) {
     std::string sides = extract_sides(pc.config);
     std::string config_str = pc.config.dump();
 
+    // Insert as INACTIVE (is_active=0) -- the leaderboard_watcher promotes
+    // models that beat the current baselines. On conflict, update stats but
+    // NEVER change is_active (preserve manual activation/deactivation).
     const char* sql = R"SQL(
         INSERT INTO models (name, type, stat, market, sides, config_json,
-                           roi_raw, roi_net, win_rate, total_bets, p_value, source)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cpp_lab')
+                           roi_raw, roi_net, win_rate, total_bets, p_value, is_active, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'cpp_lab')
         ON CONFLICT(name) DO UPDATE SET
             config_json=excluded.config_json,
             roi_raw=excluded.roi_raw,
