@@ -66,7 +66,7 @@ ExperimentResult CompoundStrategy::run(const StrategyConfig& config,
                                         const PlayerIndex& index,
                                         const KalshiCache& kalshi,
                                   const PropCache* prop_cache) {
-    WalkforwardRunner runner(store, index, kalshi);
+    WalkforwardRunner runner(store, index, kalshi, prop_cache);
 
     const std::string primary_stat = config.target_stat.empty()
         ? market_to_stat(config.target_market)
