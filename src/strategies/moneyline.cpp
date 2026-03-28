@@ -28,7 +28,8 @@ static double elo_expected(double elo_a, double elo_b) {
 ExperimentResult MoneylineStrategy::run(const StrategyConfig& config,
                                          const DataStore& store,
                                          const PlayerIndex& index,
-                                         const KalshiCache& kalshi) {
+                                         const KalshiCache& kalshi,
+                                  const PropCache* prop_cache) {
     (void)index;  // not used for game-level bets
     (void)kalshi; // ML odds come from odds files
 

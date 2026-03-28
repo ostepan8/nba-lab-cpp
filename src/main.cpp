@@ -1,5 +1,6 @@
 #include "config/config.h"
 #include "data/store.h"
+#include "data/prop_cache.h"
 #include "features/player_index.h"
 #include "features/z_score.h"
 #include "features/odds.h"
@@ -118,6 +119,7 @@ struct DataBundle {
     nba::DataStore store;
     nba::PlayerIndex player_index;
     nba::KalshiCache kalshi;
+    nba::PropCache prop_cache;
 };
 
 static DataBundle load_data(const nba::LabConfig& config) {
@@ -147,7 +149,13 @@ static DataBundle load_data(const nba::LabConfig& config) {
            db.kalshi.size(),
            duration_cast<milliseconds>(t5 - t4).count());
 
-    auto total_ms = duration_cast<milliseconds>(t5 - t0).count();
+    auto t6 = high_resolution_clock::now();
+    db.prop_cache.build(db.store);
+    auto t7 = high_resolution_clock::now();
+    printf("  PropCache built (%ldms)\n",
+           duration_cast<milliseconds>(t7 - t6).count());
+
+    auto total_ms = duration_cast<milliseconds>(t7 - t0).count();
     printf("  Total load time: %ldms\n\n", total_ms);
 
     return db;
@@ -259,11 +267,11 @@ int main(int argc, char* argv[]) {
         auto j = nlohmann::json::parse(args.single_json);
         auto strat_config = nba::StrategyConfig::from_json(j);
 
-        nba::Lab lab(db.store, db.player_index, db.kalshi, config);
+        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache);
         lab.run_single(strat_config);
 
     } else if (args.command == "bench") {
-        nba::Lab lab(db.store, db.player_index, db.kalshi, config);
+        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache);
 
         // Install signal handler for graceful interrupt
         g_lab = &lab;
@@ -274,7 +282,7 @@ int main(int argc, char* argv[]) {
 
     } else if (args.command == "run") {
         if (args.duration > 0) config.max_runtime_seconds = args.duration;
-        nba::Lab lab(db.store, db.player_index, db.kalshi, config);
+        nba::Lab lab(db.store, db.player_index, db.kalshi, config, db.prop_cache);
 
         // Install signal handler for graceful shutdown
         g_lab = &lab;

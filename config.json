@@ -4,7 +4,7 @@
     "output_dir": "/home/ostepan8/Desktop/nba-modeling/results",
     "knowledge_path": "",
     "notify_script": "/home/ostepan8/claude-code-linux-harness/notify.sh",
-    "fast_workers": 16,
+    "fast_workers": 22,
     "slow_workers": 2,
     "meanrev_weight": 0.3,
     "situational_weight": 0.08,

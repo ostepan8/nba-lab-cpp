@@ -4,6 +4,7 @@
 #include "../data/store.h"
 #include "../features/player_index.h"
 #include "../features/odds.h"
+#include "../data/prop_cache.h"
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -187,7 +188,8 @@ public:
     virtual ExperimentResult run(const StrategyConfig& config,
                                   const DataStore& store,
                                   const PlayerIndex& index,
-                                  const KalshiCache& kalshi) = 0;
+                                  const KalshiCache& kalshi,
+                                  const PropCache* prop_cache = nullptr) = 0;
 };
 
 } // namespace nba

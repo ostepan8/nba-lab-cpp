@@ -57,7 +57,8 @@ static double cover_prob(double model_margin, double spread, double std_dev) {
 ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
                                         const DataStore& store,
                                         const PlayerIndex& index,
-                                        const KalshiCache& kalshi) {
+                                        const KalshiCache& kalshi,
+                                  const PropCache* prop_cache) {
     (void)index;
     (void)kalshi;
 

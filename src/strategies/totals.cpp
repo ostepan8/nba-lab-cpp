@@ -79,7 +79,8 @@ static double t_cdf_df6(double x) {
 ExperimentResult TotalsStrategy::run(const StrategyConfig& config,
                                        const DataStore& store,
                                        const PlayerIndex& index,
-                                       const KalshiCache& kalshi) {
+                                       const KalshiCache& kalshi,
+                                  const PropCache* prop_cache) {
     (void)index;
     (void)kalshi;
 
