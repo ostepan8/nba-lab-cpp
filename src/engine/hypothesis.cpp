@@ -43,11 +43,12 @@ StrategyConfig HypothesisGenerator::generate(const std::string& /*queue_type*/) 
     double w_neural      = config_.neural_weight;
     double w_spreads     = config_.spreads_weight;
     double w_totals      = config_.totals_weight;
+    double w_four_factors = config_.four_factors_weight;
 
     double total = w_meanrev + w_situational + w_twostage + w_crossmarket
                  + w_meta + w_bayesian + w_ml_props + w_moneyline
                  + w_compound + w_residual + w_ensemble
-                 + w_timeseries + w_neural + w_spreads + w_totals;
+                 + w_timeseries + w_neural + w_spreads + w_totals + w_four_factors;
 
     double r = rand_double(0.0, total);
 
@@ -66,7 +67,8 @@ StrategyConfig HypothesisGenerator::generate(const std::string& /*queue_type*/) 
     cum += w_timeseries;  if (r < cum) return generate_timeseries();
     cum += w_neural;      if (r < cum) return generate_neural_props();
     cum += w_spreads;     if (r < cum) return generate_spreads();
-    return generate_totals();
+    cum += w_totals;      if (r < cum) return generate_totals();
+    return generate_four_factors();
 }
 
 // Helper: pick a random market/stat pair
@@ -489,6 +491,28 @@ StrategyConfig HypothesisGenerator::generate_totals() {
     std::snprintf(buf, sizeof(buf), "totals_pw%d_ow%d_edge%.1f_k%.3f",
                   c.pace_window, c.ortg_window,
                   c.min_edge_points, c.kelly);
+    c.name = buf;
+    return c;
+}
+
+
+StrategyConfig HypothesisGenerator::generate_four_factors() {
+    StrategyConfig c;
+    c.type = "four_factors";
+    c.target_stat = "H2H";
+    c.target_market = "h2h";  // bets on all 3 markets internally
+
+    c.min_games = rand_int(8, 25);
+    c.ortg_window = rand_int(5, 30);
+    c.home_advantage = rand_double(1.0, 5.0);
+    c.min_edge = rand_double(0.02, 0.15);
+    c.min_edge_points = rand_double(1.0, 5.0);
+    c.kelly = rand_double(0.01, 0.08);
+    c.max_odds = rand_double(2.0, 4.0);
+
+    char buf[128];
+    std::snprintf(buf, sizeof(buf), "ff_w%d_ha%.1f_edge%.2f_k%.3f",
+                  c.ortg_window, c.home_advantage, c.min_edge, c.kelly);
     c.name = buf;
     return c;
 }

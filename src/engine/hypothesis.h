@@ -40,6 +40,7 @@ private:
     StrategyConfig generate_neural_props();
     StrategyConfig generate_spreads();
     StrategyConfig generate_totals();
+    StrategyConfig generate_four_factors();
 };
 
 } // namespace nba

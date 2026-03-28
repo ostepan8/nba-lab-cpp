@@ -33,6 +33,7 @@ struct LabConfig {
     double neural_weight = 0.05;
     double spreads_weight = 0.03;
     double totals_weight = 0.02;
+    double four_factors_weight = 0.05;
 
     // Notification
     bool notify_enabled = true;

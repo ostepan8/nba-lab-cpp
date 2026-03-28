@@ -14,6 +14,7 @@
 #include "../strategies/neural_props.h"
 #include "../strategies/spreads.h"
 #include "../strategies/totals.h"
+#include "../strategies/four_factors.h"
 #include "../io/bet_history.h"
 #include "../io/notify.h"
 #include <nlohmann/json.hpp>
@@ -57,6 +58,7 @@ std::unique_ptr<Strategy> Lab::create_strategy(const std::string& type) {
     if (type == "neural_props")   return std::make_unique<NeuralPropsStrategy>();
     if (type == "spreads")        return std::make_unique<SpreadsStrategy>();
     if (type == "totals")         return std::make_unique<TotalsStrategy>();
+    if (type == "four_factors")   return std::make_unique<FourFactorsStrategy>();
     return std::make_unique<MeanRevStrategy>();
 }
 
