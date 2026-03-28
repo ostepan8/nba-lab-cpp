@@ -182,7 +182,7 @@ void Lab::run_single(const StrategyConfig& config) {
            config.name.c_str(), result.total_bets, result.win_rate * 100,
            result.roi * 100, result.pnl, result.pvalue, result.elapsed_seconds);
     evaluate_result(config, result);
-    log_experiment(config, result);
+    // log_experiment(config, result);  // disabled: SQLite is source of truth
     experiments_run_++;
 }
 
@@ -217,7 +217,7 @@ void Lab::bench(int n) {
                 auto s = create_strategy(configs[idx].type);
                 auto r = s->run(configs[idx], store_, index_, kalshi_);
                 evaluate_result(configs[idx], r);
-                log_experiment(configs[idx], r);
+                // log_experiment(configs[idx], r);
                 double prev = cpu_time.load();
                 while (!cpu_time.compare_exchange_weak(prev, prev + r.elapsed_seconds)) {}
                 int d = done.fetch_add(1) + 1;
@@ -302,7 +302,7 @@ void Lab::run() {
                     slow_q.q.push(hypothesis_gen_.generate("slow"));
             }
             slow_q.cv.notify_all();
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         fast_q.cv.notify_all();
         slow_q.cv.notify_all();
@@ -328,7 +328,7 @@ void Lab::run() {
                    exp, label.c_str(), cfg.name.c_str(), r.total_bets,
                    r.win_rate * 100, r.roi * 100, r.pvalue, r.elapsed_seconds);
             evaluate_result(cfg, r);
-            log_experiment(cfg, r);
+            // log_experiment(cfg, r);  // disabled: SQLite is source of truth
             if (exp % 100 == 0) {
                 auto now = std::chrono::steady_clock::now();
                 double elapsed = std::chrono::duration<double>(now - t_start).count();
