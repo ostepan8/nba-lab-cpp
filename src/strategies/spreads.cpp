@@ -76,10 +76,12 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
     const double nba_std = 12.0;  // NBA game margin std dev ~12 points
 
     std::unordered_map<std::string, SpreadTeamElo> elo_map;
-    std::unordered_set<std::string> bet_games;  // dedup: one bet per game per date
+    std::unordered_set<std::string> bet_games;
+    std::unordered_set<std::string> elo_updated;
 
     for (const auto& date : dates) {
         bet_games.clear();
+        elo_updated.clear();
         const auto& odds_lines = store.get_odds(date);
         if (odds_lines.empty()) continue;
 
@@ -213,13 +215,17 @@ ExperimentResult SpreadsStrategy::run(const StrategyConfig& config,
             result.total_bets++;
             bet_games.insert(game_key);
 
-            // Update ELO ratings using actual result
+            // Update ELO ratings (once per game)
+            std::string elo_key = date + "|" + home + "|" + away;
+            if (!elo_updated.count(elo_key)) {
+            elo_updated.insert(elo_key);
             double expected_home = elo_expected(he.elo + 50.0, ae.elo);
             double actual_home = gr->won ? 1.0 : 0.0;
             he.elo += K * (actual_home - expected_home);
             ae.elo += K * ((1.0 - actual_home) - (1.0 - expected_home));
             he.games++;
             ae.games++;
+            } // elo dedup
         }
     }
 

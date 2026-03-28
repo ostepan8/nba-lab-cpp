@@ -41,9 +41,11 @@ ExperimentResult MoneylineStrategy::run(const StrategyConfig& config,
 
     std::unordered_map<std::string, TeamElo> elo_map;
     std::unordered_set<std::string> bet_games;
+    std::unordered_set<std::string> elo_updated;
 
     for (const auto& date : dates) {
         bet_games.clear();
+        elo_updated.clear();
         const auto& odds_lines = store.get_odds(date);
         if (odds_lines.empty()) continue;
 
@@ -140,8 +142,10 @@ ExperimentResult MoneylineStrategy::run(const StrategyConfig& config,
                 }
             }
 
-            // Always update ELO from actual results
-            if (gr) {
+            // Always update ELO from actual results (once per game, not per bookmaker)
+            std::string elo_key = date + "|" + home + "|" + away;
+            if (gr && !elo_updated.count(elo_key)) {
+                elo_updated.insert(elo_key);
                 double expected_home = elo_expected(he.elo + home_advantage, ae.elo);
                 double actual_home = gr->won ? 1.0 : 0.0;
                 he.elo += K * (actual_home - expected_home);
