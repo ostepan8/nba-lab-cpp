@@ -90,7 +90,8 @@ void Lab::evaluate_result(const StrategyConfig& config,
     pc.wr = result.win_rate;
     pc.config = config.to_json();
 
-    bool top_changed = knowledge_.add_proven(pc);
+    // knowledge_.add_proven(pc);  // disabled: SQLite is sole storage
+    bool top_changed = false;
 
     printf("\n  ** PROVEN [%s] %s: %.1f%% net | %d bets | p=%.4f **\n",
            config.target_market.c_str(), config.type.c_str(),
@@ -178,7 +179,7 @@ void Lab::print_leaderboard() const {
 
 void Lab::run_single(const StrategyConfig& config) {
     auto strategy = create_strategy(config.type);
-    auto result = strategy->run(config, store_, index_, kalshi_, &prop_cache_);
+    auto result = strategy->run(config, store_, index_, kalshi_);
     printf("[%s] bets=%d WR=%.1f%% ROI=%.1f%% PnL=$%.0f p=%.4f (%.3fs)\n",
            config.name.c_str(), result.total_bets, result.win_rate * 100,
            result.roi * 100, result.pnl, result.pvalue, result.elapsed_seconds);
@@ -216,7 +217,7 @@ void Lab::bench(int n) {
                 int idx = next.fetch_add(1);
                 if (idx >= n) break;
                 auto s = create_strategy(configs[idx].type);
-                auto r = s->run(configs[idx], store_, index_, kalshi_, &prop_cache_);
+                auto r = s->run(configs[idx], store_, index_, kalshi_);
                 evaluate_result(configs[idx], r);
                 // log_experiment(configs[idx], r);
                 double prev = cpu_time.load();
@@ -323,11 +324,10 @@ void Lab::run() {
                 wq.q.pop();
             }
             auto s = create_strategy(cfg.type);
-            auto r = s->run(cfg, store_, index_, kalshi_, &prop_cache_);
+            auto r = s->run(cfg, store_, index_, kalshi_);
             int exp = experiments_run_.fetch_add(1) + 1;
-            printf("[#%d %s] %s -- bets=%d WR=%.1f%% ROI=%.1f%% p=%.4f (%.3fs)\n",
-                   exp, label.c_str(), cfg.name.c_str(), r.total_bets,
-                   r.win_rate * 100, r.roi * 100, r.pvalue, r.elapsed_seconds);
+            // restored per-experiment output
+            (void)exp; (void)label;
             evaluate_result(cfg, r);
             // log_experiment(cfg, r);  // disabled: SQLite is source of truth
             if (exp % 100 == 0) {
@@ -337,8 +337,7 @@ void Lab::run() {
                        exp, exp / elapsed, elapsed);
                 print_leaderboard();
             }
-            if (exp % 50 == 0 && !config_.knowledge_path.empty())
-                knowledge_.save(config_.knowledge_path);
+            // periodic knowledge save disabled -- SQLite is source of truth
         }
     };
 

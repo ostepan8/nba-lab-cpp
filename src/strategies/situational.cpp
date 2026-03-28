@@ -150,7 +150,7 @@ ExperimentResult SituationalStrategy::run(const StrategyConfig& config,
                                            const PlayerIndex& index,
                                            const KalshiCache& kalshi,
                                   const PropCache* prop_cache) {
-    WalkforwardRunner runner(store, index, kalshi, prop_cache);
+    WalkforwardRunner runner(store, index, kalshi);
 
     const std::string stat_name = config.target_stat.empty()
         ? market_to_stat(config.target_market)

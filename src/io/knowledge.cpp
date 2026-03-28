@@ -63,6 +63,7 @@ void KnowledgeBase::load(const std::string& path) {
 }
 
 void KnowledgeBase::save(const std::string& path) const {
+    if (path.empty()) return;
     std::lock_guard<std::mutex> lock(mutex_);
     fs::path p(path);
     if (p.has_parent_path()) fs::create_directories(p.parent_path());
@@ -97,6 +98,9 @@ bool KnowledgeBase::add_proven(const ProvenConfig& entry) {
 
     // Always save
     all_proven_.push_back(entry);
+
+    // Skip expensive top-5 comparison if vector is large (notifications handled by watcher)
+    if (all_proven_.size() > 100) return false;
 
     // Check if this enters either top 5
     // Temporarily unlock-relock pattern not needed since we hold the lock
