@@ -260,7 +260,10 @@ void Lab::run() {
            config_.neural_weight * 100, config_.spreads_weight * 100,
            config_.totals_weight * 100);
     printf("Output:  %s\n", config_.output_dir.c_str());
-    printf("Running experiments. Press Ctrl+C for graceful shutdown.\n\n");
+    printf("Running experiments. Press Ctrl+C for graceful shutdown.\n");
+    if (config_.max_runtime_seconds > 0)
+        printf("Auto-stop after %.0f seconds.\n", config_.max_runtime_seconds);
+    printf("\n");
 
     struct WQ {
         std::queue<StrategyConfig> q;
@@ -269,8 +272,20 @@ void Lab::run() {
     };
     WQ fast_q, slow_q;
 
+    auto t_start_run = std::chrono::steady_clock::now();
     auto producer = [&]() {
         while (running_.load()) {
+            // Check max runtime
+            if (config_.max_runtime_seconds > 0) {
+                double elapsed = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - t_start_run).count();
+                if (elapsed >= config_.max_runtime_seconds) {
+                    printf("\n  Max runtime (%.0fs) reached. Shutting down gracefully...\n",
+                           config_.max_runtime_seconds);
+                    running_.store(false);
+                    break;
+                }
+            }
             {
                 std::lock_guard<std::mutex> lock(fast_q.mtx);
                 while (fast_q.q.size() < size_t(config_.fast_workers * 2))

@@ -39,6 +39,7 @@ struct LabConfig {
 
     // Kalshi fee
     double kalshi_fee_rate = 0.038;
+    double max_runtime_seconds = 0;  // 0 = run forever
 
     // Load config from a JSON file. Returns defaults() on any error.
     static LabConfig load(const std::string& path);

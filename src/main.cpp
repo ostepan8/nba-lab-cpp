@@ -35,6 +35,7 @@ struct Args {
     std::string command = "info";
     std::string config_path = "config.json";
     int bench_count = 100;
+    double duration = 0;  // max runtime seconds for run command
     bool quiet = false;
     bool verbose = false;
     // For single:
@@ -63,6 +64,7 @@ void Args::print_usage() {
         "Options:\n"
         "  --config PATH    Config file (default: config.json)\n"
         "  --count N        Number of benchmark experiments (default: 100)\n"
+        "  --duration N     Max runtime in seconds for 'run' command (0 = forever)\n"
         "  --quiet          Suppress per-experiment output\n"
         "  --verbose        Show detailed per-bet output\n"
         "  -h, --help       Show this help message\n"
@@ -92,6 +94,8 @@ Args Args::parse(int argc, char* argv[]) {
             args.stat = argv[++i];
         } else if (a == "--type" && i + 1 < argc) {
             args.type = argv[++i];
+        } else if (a == "--duration" && i + 1 < argc) {
+            args.duration = std::atof(argv[++i]);
         } else if (a == "--quiet") {
             args.quiet = true;
         } else if (a == "--verbose") {
@@ -269,6 +273,7 @@ int main(int argc, char* argv[]) {
         lab.bench(args.bench_count);
 
     } else if (args.command == "run") {
+        if (args.duration > 0) config.max_runtime_seconds = args.duration;
         nba::Lab lab(db.store, db.player_index, db.kalshi, config);
 
         // Install signal handler for graceful shutdown
