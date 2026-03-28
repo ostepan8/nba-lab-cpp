@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(nba_lab VERSION 1.0 LANGUAGES CXX)
+project(nba_lab VERSION 1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,9 +19,12 @@ else()
     message(STATUS "LightGBM not found -- using heuristic fallbacks for ML strategies")
 endif()
 
+# SQLite3 amalgamation (included as source -- no system package needed)
+set(SQLITE3_SRC "${CMAKE_SOURCE_DIR}/include/sqlite3.c")
+
 file(GLOB_RECURSE SOURCES "src/*.cpp")
-add_executable(nba_lab ${SOURCES})
-target_link_libraries(nba_lab Threads::Threads)
+add_executable(nba_lab ${SOURCES} ${SQLITE3_SRC})
+target_link_libraries(nba_lab Threads::Threads dl)
 
 if(LGBM_LIB)
     target_link_libraries(nba_lab ${LGBM_LIB})

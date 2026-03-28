@@ -36,6 +36,8 @@ Lab::Lab(const DataStore& store, const PlayerIndex& index,
       config_(config), hypothesis_gen_(config) {
     if (!config_.knowledge_path.empty())
         knowledge_.load(config_.knowledge_path);
+    if (!config_.models_db_path.empty())
+        models_db_.open(config_.models_db_path);
 }
 
 std::unique_ptr<Strategy> Lab::create_strategy(const std::string& type) {
@@ -95,6 +97,8 @@ void Lab::evaluate_result(const StrategyConfig& config,
 
     if (!config_.knowledge_path.empty())
         knowledge_.save(config_.knowledge_path);
+    if (models_db_.is_open())
+        models_db_.upsert_model(pc);
     if (!result.bets.empty())
         bet_history::save(config.name, result.bets, config_.output_dir + "/bet_history");
 

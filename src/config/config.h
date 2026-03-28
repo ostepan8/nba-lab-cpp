@@ -11,6 +11,7 @@ struct LabConfig {
     std::string output_dir;
     std::string knowledge_path;
     std::string notify_script;
+    std::string models_db_path;  // SQLite models.db path (unified DB for API)
 
     // Workers
     int fast_workers = 6;

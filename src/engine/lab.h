@@ -6,6 +6,7 @@
 #include "../features/player_index.h"
 #include "../features/odds.h"
 #include "../io/knowledge.h"
+#include "../io/models_db.h"
 #include "hypothesis.h"
 #include <memory>
 #include <map>
@@ -54,6 +55,7 @@ private:
     std::mutex log_mutex_;
 
     KnowledgeBase knowledge_;
+    ModelsDB models_db_;
     HypothesisGenerator hypothesis_gen_;
 };
 

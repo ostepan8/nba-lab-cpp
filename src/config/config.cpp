@@ -24,6 +24,7 @@ LabConfig LabConfig::defaults() {
     c.output_dir       = "~/Desktop/nba-modeling/results";
     c.knowledge_path   = "~/Desktop/nba-modeling/results/lab/knowledge_cpp.json";
     c.notify_script    = "~/claude-code-linux-harness/notify.sh";
+    c.models_db_path   = "~/claude-code-linux-harness/data/models.db";
     c.fast_workers     = 6;
     c.slow_workers     = 2;
     c.meanrev_weight     = 0.20;
@@ -76,6 +77,7 @@ LabConfig LabConfig::load(const std::string& path) {
     if (j.contains("output_dir"))         c.output_dir         = j["output_dir"].get<std::string>();
     if (j.contains("knowledge_path"))     c.knowledge_path     = j["knowledge_path"].get<std::string>();
     if (j.contains("notify_script"))      c.notify_script      = j["notify_script"].get<std::string>();
+    if (j.contains("models_db_path"))     c.models_db_path     = j["models_db_path"].get<std::string>();
     if (j.contains("fast_workers"))       c.fast_workers       = j["fast_workers"].get<int>();
     if (j.contains("slow_workers"))       c.slow_workers       = j["slow_workers"].get<int>();
     if (j.contains("meanrev_weight"))     c.meanrev_weight     = j["meanrev_weight"].get<double>();
@@ -144,6 +146,7 @@ void LabConfig::save(const std::string& path) const {
     j["output_dir"]         = output_dir;
     j["knowledge_path"]     = knowledge_path;
     j["notify_script"]      = notify_script;
+    j["models_db_path"]     = models_db_path;
     j["fast_workers"]       = fast_workers;
     j["slow_workers"]       = slow_workers;
     j["meanrev_weight"]     = meanrev_weight;
@@ -177,6 +180,7 @@ void LabConfig::expand_paths() {
     output_dir     = expand_home(output_dir);
     knowledge_path = expand_home(knowledge_path);
     notify_script  = expand_home(notify_script);
+    models_db_path = expand_home(models_db_path);
 }
 
 } // namespace nba
